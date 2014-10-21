@@ -5,6 +5,11 @@
 ##Creat Time: Mon Dec  3 10:51:37 CST 2012
 ##Vanderbilt Center for Quantitative Sciences
 ##############################################
+#Edited By: Andy Zeng
+#Email: azeng95@gmail.com
+#Date: October 21st, 2014
+#BC Genome Sciences Centre
+#############################################
 package Mitoanno;
 use strict;
 use warnings;
@@ -318,7 +323,7 @@ sub codon2aa {
     my($codon) = @_;
 
     $codon = uc $codon;
- 
+ # note that the mitochondrial genetic code is different from the universal genetic code.
     my(%genetic_code) = (
     
     'TCA' => 'S',    # Serine
@@ -335,7 +340,7 @@ sub codon2aa {
     'TAG' => 'STOP',    # Stop
     'TGC' => 'C',    # Cysteine
     'TGT' => 'C',    # Cysteine
-    'TGA' => 'STOP',    # Stop
+    'TGA' => 'W',    # Tryptophan (different from universal code)
     'TGG' => 'W',    # Tryptophan
     'CTA' => 'L',    # Leucine
     'CTC' => 'L',    # Leucine
@@ -353,7 +358,7 @@ sub codon2aa {
     'CGC' => 'R',    # Arginine
     'CGG' => 'R',    # Arginine
     'CGT' => 'R',    # Arginine
-    'ATA' => 'I',    # Isoleucine
+    'ATA' => 'I',    # Methionine (different from universal code)
     'ATC' => 'I',    # Isoleucine
     'ATT' => 'I',    # Isoleucine
     'ATG' => 'M',    # Methionine
@@ -367,8 +372,8 @@ sub codon2aa {
     'AAG' => 'K',    # Lysine
     'AGC' => 'S',    # Serine
     'AGT' => 'S',    # Serine
-    'AGA' => 'R',    # Arginine
-    'AGG' => 'R',    # Arginine
+    'AGA' => 'STOP',    # Stop (different from universal code)
+    'AGG' => 'STOP',    # Stop (different from universal code)
     'GTA' => 'V',    # Valine
     'GTC' => 'V',    # Valine
     'GTG' => 'V',    # Valine
