@@ -1,17 +1,20 @@
 #!/usr/bin/perl
 #############################################
-#Author: Jiang Li
-#email: riverlee2008@gmail.com
-#Creat Time: 
+#Original Author: Jiang Li
+#Email: riverlee2008@gmail.com
 #Vanderbilt Center for Quantitative Sciences
 #############################################
+#Edited By: Andy Zeng 
+#Email: azeng95@gmail.com
+#Date: October 21st, 2014 
+#BC Genome Sciences Centre 
+#############################################
+
 use strict;
 use warnings;
 use FindBin;
 use Cwd;
 package Circoswrap;
-
-#Circos plot for heterplaysmy (somatic mutations etc, not implemented yet).
 
 #Constructor
 sub new{
@@ -20,7 +23,7 @@ sub new{
     my $self={
         _build=>"hg19",
         _circosbin=>"$FindBin::Bin/Resources/circos-0.56/bin/circos",     #where is the circos program
-        _karyotype=>"$FindBin::Bin/Resources/hg19_karyotype_MT.txt",   #Tell where is the karyotype file of mitochidrial genome
+        _karyotype=>"$FindBin::Bin/Resources/hg19_karyotype_MT.txt",   #Tell where is the karyotype file of mitochondrial genome
         _genehighlight=>"$FindBin::Bin/Resources/hg19_genes_MT.highlights.txt",  #genes in mitochondrial, by highlight
         _genetext=>"$FindBin::Bin/Resources/hg19_genes_MT.text.txt",             #genes plot in text
         _configtemplate=>"$FindBin::Bin/Resources/circos-heteroplasmy.template.conf",         #default is the template for heteroplasmy plot
@@ -28,8 +31,8 @@ sub new{
         _configoutput=>"circos-mitoseek.conf",                       #circos conf file output
         _textoutput=>"circos-mitoseek.text.txt",   #circos text data
         _scatteroutput=>"circos-mitoseek.scatter.txt", #circos scatter data
-        _datafile=>undef,                               #The file store the heterplaysmy result, will parse it into circos data format
-        _cwd=>$currentdir                           #The output dir
+        _datafile=>undef,                               #The file store the heteroplasmy result, will parse it into circos data format
+        _cwd=>$currentdir                           #The output directory
     };
     bless $self,$class;
     return $self;
@@ -57,6 +60,15 @@ sub plot{
                 $self->{_circosbin}." -conf ".$self->{_configoutput}. ">/dev/null 2>&1";
    # print $command;
    system($command);
+}
+
+sub _formatnumeric{
+    my ($i) = @_;
+    my $r=sprintf("%.3f",$i);
+    if($r eq '0.000' && $i!=0){#use scientific notation
+        $r=sprintf("%.3e",$i);
+    }
+    return $r;
 }
 
 #Copy the templateconf and change the  into .text and .scatter
@@ -96,14 +108,11 @@ sub prepare{
         open(TEXT,">".$self->{_cwd}."/".$self->{_textoutput}) or die $!;
         open(SCATTER,">".$self->{_cwd}."/".$self->{_scatteroutput}) or die $!;
         while(<IN>){
-            my($chr,$pos,$ref,$forward_A,$forward_T,$forward_C,$forward_G,$reverse_A,$reverse_T,$reverse_C,$reverse_G,
-               $hetero,$lower,$upper,$major_allele,$minor_allele,$major_count,$minor_count,$gene,$genedetail,$exonic,$aminochange,undef)=split "\t";
-            
-            my $text="$ref:$major_allele->$minor_allele";
-            if(defined($exonic) && ($exonic eq 'non-synonymous' || $exonic eq 'stopgain' || $exonic eq 'stoploss')){
-                my (undef,undef,$tmp) = split ":",$aminochange;
-                $text.="|$tmp";
-            }
+            my($chr,$pos,$ref,$alt,$forward_A,$forward_T,$forward_C,$forward_G,$reverse_A,$reverse_T,$reverse_C,$reverse_G, $variant,
+               $hetero,undef)=split "\t";
+ 
+            my $text="$pos:$ref->$alt";
+
             print SCATTER join "\t",("MT",$pos,$pos,$hetero);
             print SCATTER "\n";
             
@@ -118,9 +127,10 @@ sub prepare{
         open(IN,$self->{_datafile}) or die $!; <IN>; #skip header
         open(TEXT,">".$self->{_cwd}."/".$self->{_textoutput}) or die $!;
         while(<IN>){
-            my($chr,$pos,$ref,$tumorGeno,$tumorDP,$normalGeno,$normalDP,$mitoGene,$mitoGeneD)=split "\t";
+            my($chr,$pos,$ref,$tumorGeno,$tumorDP,$tumorhetero,$normalGeno,$normalDP,$normalhetero,$mitoGene,$mitoGeneD)=split "\t";
             
-            my $text="$ref:$tumorGeno->$normalGeno";
+	        my $heterodiff = _formatnumeric(abs( $tumorhetero - $normalhetero ));
+            my $text="$normalGeno->$tumorGeno:$heterodiff";
            
             print TEXT join "\t",("MT",$pos,$pos,$text);
             print TEXT "\n";
