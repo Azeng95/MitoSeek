@@ -5,6 +5,12 @@
 #Creat Time: Tue 23 Oct 2012 01:37:54 PM CDT
 #Vanderbilt Center for Quantitative Sciences
 #############################################
+#Edited By: Andy Zeng
+#Email: azeng95@gmail.com
+#Date: October 21st, 2014
+#BC Genome Sciences Centre
+#############################################
+
 use strict;
 use warnings;
 #========Begin loading necessary packages===========#
@@ -19,9 +25,7 @@ use File::Path;
 use Cwd 'abs_path';
 use FindBin;
 use List::Util qw(sum min max);
-use Text::NSP::Measures::2D::Fisher::left;  # For fisher test
 use Statistics::Multtest qw(BH);
-use Math::SpecFun::Beta qw(beta);
 use lib "$FindBin::RealBin";
 ## load our own packages
 use Convert;
@@ -130,7 +134,7 @@ my $mitobases                          = $acceptedgenomelength{'hg19'};  #Read f
 my $totalbases                         = $totalexonbases;                #This the genome length, the exon length is 70757781
 my $totalbed                           = $exonbed{'withchr'};            #Default is exon or RNA-Seq sequences
 
-#Our own defined class, will be used in the _determine_heteroplasmy
+#Our own defined class, will be used in the _determine_variants
 my $convert = Convert->new();                                           #Handle h19 position and rCRS position convertion
 my $mitoanno = Mitoanno->new();                                         #Annotating a give position on mitochondria
 my $circos   = Circoswrap->new();
@@ -144,27 +148,25 @@ my $type              = 1;          #1=exome, 2=whole genome, 3= RNAseq, 4 = mit
 #my $saveallelecount   = 1;          #-a
 my $producecircosplot = 1;          #-ch, produce circos plot for heteroplasmic mutation
 my $hp                = 5;          #-hp, heteroplasmy threshold using [int] percent alternatie allele observed, default=5;
-my $ha                = 0;          #-ha, heteroplasmy threshold using [int] allele observed, default=0;
-my $depth             = 50;         #The minimum recommended depth requirement for detecting heteroplasmy is 50. Lower depth will severely damage the confidence of heteroplasmy calling
-my $isall             = 0;          #If - A is used, the total read count is the total allele count of all allele observed. Otherwise, the total read count is the sum of major and minor allele counts. Default = off
+my $ha                = 10;          #-ha, heteroplasmy threshold using [int] allele observed, default=10;
+my $depth             = 10;         #The minimum recommended depth requirement for detecting heteroplasmy and somatic mutations is 10. Low depth will severely damage the confidence of heteroplasmy and somatic mutation calling
+my $isall             = 1;          #If - A is used, the total read count is the total allele count of all allele observed. Otherwise, the total read count is the sum of major and minor allele counts. Default = on
 my $mmq               = 20;         #minimum map quality, default=20
 my $mbq               = 20;         #minimum base quality, default=20
-my $sb                = 10;         #remove all sites with strand bias score in the top [int] %, default=10;
+my $sb                = 10;          #remove all sites with strand bias score in the top [int] %, default=10;
 my $cn                = 0;          #Estimate relative copy number of input bam(s),does not work with mitochondria targeted sequencing bam files
-my $sp                = 5;          #somatic mutation detection threshold, [int]% of alternative allele observed in tumor, default=5;
-my $sa                = 3;          #somatic mutation detection trheshold, int number of alternative allele observed in tumor.
+my $sp                = 5;          #somatic mutation detection threshold, [int]% of change in heteroplasmy in tumor, default=5;
+my $sa                = 10;          #somatic mutation detection threshold, int number of alternative allele observed in tumor. default=10
 my $cs                = 1;          #Produce circos plot input files and circos plot figure for somatic mutations
 my $regionbed         = undef;      #A bed file that contains the regions mitoSeek will perform analysis on
 my $inref             = 'hg19';     #The reference used in the input bam files
-my $outref            = 'hg19';     #The output files used in the reference rCRS;
+my $outref            = 'rCRS';     #The output files used in the reference
 my $qc                = 1;          #Produce QC result
 my $str               = 2;          #structure variants cutoff, this cutoff applied to >$str mates supporting this cross different chromosome mapping
 my $strflagmentsize   = 500;        #structure variants cutoff for those abnormal large delete/insertion
-my $A                 = 3.87;       #
-my $B                 = 174.28;     #
-my $advance          = 0;          #if set 1, need to remove those mito reads could be remapped to non-mitochondria human genome
+my $advance           = 0;          #if set 1, need to remove those mito reads could be remapped to non-mitochondria human genome
 my $bwaindex          = undef;
-my $bwa               = "bwa";      #supporse you have bwa install in your $PATH
+my $bwa               = "bwa";      #suppose you have bwa install in your $PATH
 my $help              =0;
 #========End defining other variables======================#
 
@@ -186,7 +188,7 @@ unless (
         "sb=i"  => \$sb,
         "cn!"   => \$cn,
         "sp=i"  => \$sp,
-        "sa=i"  => \$sa,
+	"sa=i"  => \$sa,
         "cs!"   => \$cs,
 #        "L=s"   => \$regionbed,
         "r=s"   => \$inref,
@@ -195,8 +197,6 @@ unless (
         "t=i"   => \$type,
         "str=i" => \$str,
         "strf=i"=> \$strflagmentsize,
-        "alpha=f"   => \$A,
-        "beta=f"   => \$B,
         "bwa=s" =>\$bwa,
         "bwaindex=s"=>\$bwaindex,
         "samtools=s"=>\$samtools,
@@ -468,9 +468,9 @@ sub _main{
         }
         
         _info($index.".1,Detecting heteroplasmy from '$mitobam1' (Output: $mitoheteroplasmy1)");
-        _determine_heteroplasmy( $mitobasecall1, $hp, $ha, $isall, $sb,$mitoheteroplasmy1 );
+        _determine_variants( $mitobasecall1, $hp, $ha, $isall, $sb,$mitoheteroplasmy1 );
         _info($index++.".2,Detecting heteroplasmy from '$mitobam2' (Output: $mitoheteroplasmy2)");
-        _determine_heteroplasmy( $mitobasecall2, $hp, $ha, $isall, $sb,$mitoheteroplasmy2 );
+        _determine_variants( $mitobasecall2, $hp, $ha, $isall, $sb,$mitoheteroplasmy2 );
         
         #Plot heteroplasmy ciros plot
         if($producecircosplot){
@@ -555,7 +555,7 @@ sub _main{
             );
         }
         _info($index++.",Detecting heteroplasmy from '$mitobam1' (Output: $mitoheteroplasmy1)");
-        _determine_heteroplasmy( $mitobasecall1, $hp, $ha, $isall, $sb,$mitoheteroplasmy1 );
+        _determine_variants( $mitobasecall1, $hp, $ha, $isall, $sb,$mitoheteroplasmy1 );
         if($producecircosplot){
             $circos->build($outref);
             $circos->circosoutput($mitocircosheteroplasmyfigure1);
@@ -796,6 +796,7 @@ sub _wrap_mito_cnv{
 #$totalbam: alignment mapped to whole genome
 #$isbam: bam or sam
 #$mmq: mimimal mapping quality
+#note that this assumes consistent exome enrichment in all samples. This assumption is impractical, as exome enrichment efficiency varies greatly for each sample. As a result, copy number estimations are not reliable for exome sequencing. 
 
 sub _mito_cnv_by_reads{
     my ($mitobam,$totalbam,$isbam,$mmq) = @_;
@@ -904,27 +905,24 @@ Usage: perl mitoSeek.pl -i inbam
 -j [bam]                Input bam file2, if this file is provided, it will conduct somatic mutation mining, and it will be 
                         taken as normal tissue.
 -t [input type]         Type of the bam files, the possible choices are 1=exome, 2=whole genome, 3= RNAseq, 4 = mitochondria only,default = 1
--d [int]                The minimum recommended depth requirement for detecting heteroplasmy. Lower depth will severely damage the 
-                        confidence of heteroplasmy calling, default=50
+-d [int]                The minimum recommended depth requirement for detecting heteroplasmy and somatic mutations. default=10
 -ch                     Produce circos plot input files and circos plot figure for heteroplasmic mutation,
                         (-noch to turn off and -ch to turn on), default = on
 -hp [int]               Heteroplasmy threshold using [int] percent alternative allele observed, default = 5
--ha [int]               Heteroplasmy threshold using [int] allele observed, default = 0
--alpha [float]          Shape1 parameter of Beta prior distribution, default is 3.87 which is estimated from 600 BRCA samples
--beta  [float]          Shape1 parameter of Beta prior distribution, default is 174.28, which is estimated from 600 BRCA samples
+-ha [int]               Heteroplasmy threshold using [int] allele observed, default = 10
 -A                      If - A is used, the total read count is the total allele count of all allele observed. 
-                        Otherwise, the total read count is the sum of major and minor allele counts. Default = off
+                        Otherwise, the total read count is the sum of major and minor allele counts. Default = on
 -mmq [int]              Minimum map quality, default =20
 -mbq [int]              Minimum base quality, default =20
 -sb [int]               Remove all sites with strand bias score in the top [int] %, default = 10 
 -cn                     Estimate relative copy number of input bam(s), does not work with mitochondria targeted sequencing bam files,
-                        (-noch to turn off and -ch to turn on) default = off.
+                        (-nocn to turn off and -cn to turn on) *unreliable with exomes.  default = off.
 -sp [int]               Somatic mutation detection threshold,int = percent of alternative allele observed in tumor, default int=5
--sa [int]               Somatic mutation detection threshold,int = number of alternative allele observed in tumor, default int=3
+-sa [int] Somatic mutation detection threshold,int = number of alternative allele observed in tumor, default int=10
 -cs                     Produce circos plot input files and circos plot figure for somatic mutation, 
                         (-nocs to turn off and -cs to turn on), default = off
 -r [ref]                The reference used in the bam file, the possible choices are hg19 and rCRS, default=hg19
--R [ref]                The reference used in the output files, the possible choices are hg19 and rCRS, default=hg19
+-R [ref]                The reference used in the output files, the possible choices are hg19 and rCRS, default=rCRS
 -str [int]              Structure variants cutoff for those discordant mapping mates, 
                         int = number of spanning reads supporting this structure variants, default = 2
 -strf [int]             Structure variants cutoff for those large deletions,
@@ -938,34 +936,6 @@ Usage: perl mitoSeek.pl -i inbam
                         -bwaindex option. Default extraction without removing step.
 
 
-\@------------------------------------------------------------@
-|       Statistical framework for heteroplasmy detection     |
-|------------------------------------------------------------|
-|              Fisher test for heterplasmy                   |
-|------------------------------------------------------------|
-|                           major   minor                    |
-|               observed    n11     n12 | n1p                |
-|               expected    n21     n22 | n2p                |
-|                          -----------------                 |
-|                           np1     np2   npp                |
-|   n21 = (n11+n12)*(1-hp/100) in which hp is defined by -hp |
-|   n22 = (n11+n12)*hp/100  in which hp is defined by -hp    |
-|------------------------------------------------------------|
-|                Empirical Bayesian method                   |
-|------------------------------------------------------------|
-|                          _Inf                              |
-|                         /                                  |
-|           probability = | f(x)dx                           |
-|                       _/p                                  |
-|   probablity is the calculus of f(x) from p to Inf         |
-|   x=hp/100 in which hp is defined by -hp                   |
-|   f(x) = 1/beta(b+A,a+B)*x^(A+b-1)*(1-x)^(B+a-1)           |
-|   in which a/b is the number of major/minor allele,        |
-|   A and B are estimated from 600 BRCA samples.             |
-|------------------------------------------------------------|
-|    For documentation, citation & bug-report instructions:  |
-|           https://github.com/riverlee/MitoSeek             |
-\@------------------------------------------------------------@
 
 USAGE
 
@@ -993,7 +963,7 @@ sub _mito_qc_stat {
         $depthdistribution_table,  $templatelengthdistribution_table,
         $percentofbasepairscovered_table
     ) = @_;
-    my $maxreads = 100000; #In case some alignment on mitochondrial is extremly large that will take too much memory and then crash ymy server.
+    my $maxreads = 100000; #In case some alignment on mitochondrial is extremely large that will take too much memory and then crash ymy server.
     $maxreads = 10 if ($debug);
 
     if ($isbam) {
@@ -1110,7 +1080,7 @@ sub _mito_qc_stat {
     #2) persequencequality density distribution
     _density(
         \@persequencequality, 800, 600, 'Quality score',
-        'Density', "Per sequence quality socre distribution ($encoding)",
+        'Density', "Per sequence quality score distribution ($encoding)",
         $mappingquality_figure, 0, undef, 30,$mappingquality_table
     );
 
@@ -1118,7 +1088,7 @@ sub _mito_qc_stat {
     _boxplot(
         \@perbasequality, 800, 600, 'Bases',
         'Quality score',
-        "Per base quality socre distribution ($encoding)",
+        "Per base quality score distribution ($encoding)",
         $perbasequality_figure, undef, undef, 30,$perbasequality_table
     );
 
@@ -1438,7 +1408,7 @@ sub _get_mitochondrial_bed {
         }
     }
     unless ($flag) {
-        _error("No mithochondrial chromosome detected from the header");
+        _error("No mitochondrial chromosome detected from the header");
         exit(1);
     }
    
@@ -1463,77 +1433,6 @@ sub _get_mitochondrial_bed {
     close OUT;
 }
 
-#         word2   ~word2
-#word1    n11      n12 | n1p
-#~word1   n21      n22 | n2p
-#         --------------
-#         np1      np2   npp
-#a number of major allele
-#b number of minor allele
-#p percentage of determining a heteroplasmy
-sub fisher_left{
-    my ($a,$b,$p) = @_;
-    if(@_ !=3){
-        print  "usage fisher_left major minor percetage\n";
-        exit(1);
-    }
-    my $npp = $a+$b+$a+$b;
-    my $n1p = $a+$b;
-    my $np1 = $a+($a+$b)*(1-$p);
-    my $n11 = $a;
-    my $left_value = calculateStatistic( n11=>$n11,
-         n1p=>$n1p,
-         np1=>$np1,
-         npp=>$npp);
-    
-   if(getErrorCode()){
-        $left_value=1;
-   }
-   $left_value=0 if($left_value<0);
-   $left_value=1 if($left_value>1);
-   return($left_value);
-}
-
-#$major number of major allele
-#$minor number of minor allele
-#$x     default 0.01, equal to hp/100
-#$len   to separate 0 to x into len
-#$A     A=3.87
-#$B     B=174.28
-sub empirical_bayesian{
-    my ($major,$minor,$x,$len,$A,$B) = @_;
-    my $width=$x/($len-1);
-    my @values;
-    for my $i (1..$len){
-        my $tmp = ($i-1)*$width;
-        my $v = (1/beta($minor+$A,$major+$B)) * ($tmp**($A+$minor-1)) * ((1-$tmp)**($B+$major-1)) ;
-        push @values,$v*$width;
-    }
-    #sum @values
-    my $sum = 0;
-    foreach (@values){
-        $sum+=$_;
-    }
-    my $r=(1-$sum);
-    $r=0 if ($r<0);
-    $r=1 if ($r>1);
-    return $r;
-}
-
-#convert a probablity into phred score
-sub phred{
-    my ($p) = @_;
-    if($p<=0){
-        return 255;
-    }else{
-        return -10*log10($p);
-    }
-}
-
-sub log10{
-    my $v=shift;
-    return log($v)/log(10);
-}
 
 #Determine heteroplasmy mutations from a basecall format file with given parameters
 #Parameters:
@@ -1543,15 +1442,13 @@ sub log10{
 #$isall   (-A)  0/1, 1 denotes that the total read count is the total allele count of all allele observed,
 #         while 0 indicates the total read count is the sum of major and minor allele counts, default=0
 #$sb      (-sb) Remove all sites with strand bias score in the top %, default = 10
-sub _determine_heteroplasmy {
+sub _determine_variants {
     my ( $inbase, $hp, $ha, $isall, $sb, $outheteroplasmy ) = @_;
     open( IN, $inbase ) or die $!;
     <IN>;    #skip the header
              #my @result;
     my %result;
     my %sb;
-    my %rawpvalue;
-    my %empirical_probality;
     while (<IN>) {
         s/\r|\n//g;
         my (
@@ -1559,6 +1456,22 @@ sub _determine_heteroplasmy {
             $forward_T, $forward_C, $forward_G, $reverse_A,
             $reverse_T, $reverse_C, $reverse_G
         ) = split "\t";
+	
+	#added 140827
+            my $convertloc=$loc;
+            my $convertref=$ref;
+            if($inref ne $outref){ #need to convert genome location
+                  if($inref eq 'hg19' && $outref eq 'rCRS'){
+                        $convertloc=$convert->hg19TorCRS($loc);
+                        $convertref=$convert->rCRSref($convertloc);
+                  }else{
+                        $convertloc=$convert->rCRSTohg19($loc);
+                        $convertref=$convert->hg19ref($convertloc);
+                  }
+
+                  next if (!defined($convertloc));  #can't be mapped between different assembly
+            }
+	#added 140827
 
         # Get the major allele and minor allele.
         my %atcg;
@@ -1569,25 +1482,34 @@ sub _determine_heteroplasmy {
         my @atcg         = sort { $atcg{$b} <=> $atcg{$a} } keys %atcg; #large to small
         my $major_allele = $atcg[0];
         my $minor_allele = $atcg[1];
+	my $alternate_allele;
         my $totaldepth= $atcg{A} + $atcg{C} + $atcg{T} + $atcg{G} ;
-        
-        next if ($totaldepth <= $depth);  #only have sufficiant depth will conduct heteroplasmy detection
 
-        # Added on 2013-02-12, fisher test (left)
-        my $heteroplasmy_fisher_pvalue = fisher_left($atcg{$major_allele},$atcg{$minor_allele},$hp/100);
-        $rawpvalue{$loc}=$heteroplasmy_fisher_pvalue;
+	if ($atcg[0] eq $convertref) { 
+		$alternate_allele = $atcg[1];
+	} else {
+		$alternate_allele = $atcg[0];
+	}
+
+        next if ($totaldepth <= $depth);  #only have sufficient depth will conduct heteroplasmy detection
+
+       
         #Calculate heteroplasmy ratio
         my $heteroplasmy = 0;
         if ($isall) {
-            #$heteroplasmy =
-            #  _formatnumeric($atcg{$minor_allele} /$totaldepth);
-            $heteroplasmy = _divide($atcg{$minor_allele},$totaldepth);
+            $heteroplasmy = _divide($atcg{$alternate_allele},$totaldepth);
         }
         else {
-           # $heteroplasmy =
-           # _formatnumeric($atcg{$minor_allele} /
-           #  ( $atcg{$major_allele} + $atcg{$minor_allele} ));
-           $heteroplasmy = _divide($atcg{$minor_allele},$atcg{$major_allele}+$atcg{$minor_allele});
+           $heteroplasmy = _divide($atcg{$alternate_allele},$atcg{$major_allele}+$atcg{$minor_allele});
+        }
+
+        #Calculate minor allele frequency 
+        my $maf = 0;
+        if ($isall) {
+            $maf = _divide($atcg{$minor_allele},$totaldepth);
+        }
+        else {
+           $maf = _divide($atcg{$minor_allele},$atcg{$major_allele}+$atcg{$minor_allele});
         }
 
         #Calculate 95% confidence interval
@@ -1604,24 +1526,33 @@ sub _determine_heteroplasmy {
         }
 
         #Stat values could be
-        #0 (not a heteroplasmy mutation)
-        #1 (show heteroplasmy, but not pass the cutoff) (hp,ha,depth)
-        #2 (heteroplasmy mutation pass cutoff and not have strong strand bias)
-        #3 (heteroplasmy mutation pass cutoff but show strong strand bias)
+        #0 (not a variant)
+        #1 (show variant alleles, but does not pass the cutoff) (hp,ha,depth)
+        #2 (heteroplasmic variant)
+        #3 (homoplasmic variant)
         my $stat = 0;
         if ( $heteroplasmy > 0 ) {
 
-#determine 1 or 2 at this stage (for value 3, need to first calculate strand bias across all the site, and then modify those with stat=2, only if when $sb is not equal to 0)
-            #if ( $heteroplasmy > $hp / 100 && $atcg{$minor_allele} > $ha ) {
-            if ( $heteroplasmy > $hp / 100 && $atcg{$minor_allele} > $ha ) {  #use $depth which is not passed by function
-                $stat = 2;
-            }
-            else {
-                $stat = 1;
-            }
+	    if ( $alternate_allele eq $major_allele && $atcg{$minor_allele} < $ha ) {
+		$stat = 3;
+	    } else {
+                if ( $maf > $hp / 100 && $atcg{$minor_allele} > $ha ) {  #use $depth which is not passed by function
+                    $stat = 2;
+                }
+                else {
+                    $stat = 1;
+            	}
+	    }
         }
 
-#If provided strand bias cutoff, need to re-loop the @result, change state=2 to 3 when necessary.
+	my $variant_type;
+        if ($stat == 2) {
+            $variant_type = "Heteroplasmy";
+        }
+        else {
+            $variant_type = "Homoplasmy";
+        }
+
 #        push @result,
 #          [
 #            $chr,          $loc,          $ref,
@@ -1634,6 +1565,7 @@ sub _determine_heteroplasmy {
 #          ];
         $result{$loc}->{'chr'}                = $chr;
         $result{$loc}->{'ref'}                = $ref;
+ 	$result{$loc}->{'alt'}                = $alternate_allele;
         $result{$loc}->{'A'}                  = $forward_A;
         $result{$loc}->{'T'}                  = $forward_T;
         $result{$loc}->{'C'}                  = $forward_C;
@@ -1643,6 +1575,7 @@ sub _determine_heteroplasmy {
         $result{$loc}->{'c'}                  = $reverse_C;
         $result{$loc}->{'g'}                  = $reverse_G;
         $result{$loc}->{'stat'}               = $stat;
+	$result{$loc}->{"variant_type"}       = $variant_type;
         $result{$loc}->{'heteroplasmy'}       = $heteroplasmy;
         $result{$loc}->{'lower'}              = $lower;
         $result{$loc}->{'upper'}              = $upper;
@@ -1652,7 +1585,7 @@ sub _determine_heteroplasmy {
         $result{$loc}->{'minor_allele_count'} = $atcg{$minor_allele};
 
         #calculate strand bias if $sb>0
-        #if ( $sb > 0 ) {
+        if ( $sb > 0 ) {
             my (
                 $forward_primary_allele_count,
                 $forward_non_primary_allele_count,
@@ -1691,62 +1624,26 @@ sub _determine_heteroplasmy {
             );
             
             $result{$loc}->{'sb'} = $sb{$loc};
-        #} #sb calculate
+        } #sb calculate
     }
 
-    #Re-loop the @result and write out
-    #    if ( $sb > 0 ) {
-    #        my @sbvalue = sort { $b <=> $a } values %sb;
-    #        my $index = int( scalar(@sbvalue) * $sb / 100 ) - 1;
-    #        $index = 0         if ( $index < 0 );
-    #        $index = $#sbvalue if ( $index > $#sbvalue );
-    #        my $cutoff = $sbvalue[$index];
-    #        foreach my $arrayref (@result) {
-    #            if (   $sb{ $arrayref->[1] } >= $cutoff
-    #                && $arrayref->[11] == 2 )
-    #            {
-    #                $arrayref->[11] = 3;
-    #            }
-    #        }
-    #    }
-    if ( $sb > 0 ) { 
-        my @sbvalue = sort { $a <=> $b } values %sb;   #small to large
-        my $index = int( scalar(@sbvalue) * $sb / 100 ) - 1;
-        $index = 0         if ( $index < 0 );
-        $index = $#sbvalue if ( $index > $#sbvalue );
-        my $cutoff = $sbvalue[$index];
-
-        foreach my $loc ( keys %result ) {
-            if ( $sb{$loc} >= $cutoff && $result{$loc}->{'stat'} == 2 ) {
-                $result{$loc}->{'stat'} = 3;
-            }
-        }
-    }
-
-    #Added on 2013-02-12, multiple test
-    #Modified on  
-    my $adjustpref=[];
-    if(keys %rawpvalue){
-        $adjustpref=BH(\%rawpvalue);
-    }
 
     #write out
     open( OUT, ">$outheteroplasmy" ) or die $!;
     print OUT join "\t",
       (
         "#chr",               "pos",
-        "ref",                "forward_A",
-        "forward_T",          "forward_C",
-        "forward_G",          "reverse_A",
-        "reverse_T",          "reverse_C",
-        "reverse_G",          "heteroplasmy",
+        "ref",		      "alt",  
+	"forward_A",	      "forward_T",        
+	"forward_C",	      "forward_G",         
+	"reverse_A",	      "reverse_T",          
+	"reverse_C",	      "reverse_G",         
+	"variant_type",       "heteroplasmy",
         "95\%ci_lower",       "95\%ci_upper",
         "major_allele",       "minor_allele",
         "major_allele_count", "minor_allele_count",
         "gene","genedetail","exonic_function","aminochange",
         "strand_bias","pathogenic_variants","diseases","links",
-        "fisher.pvalue","fisher.adjust.pvalue","fisher.phred.score",
-        "empirical.probability","empirical.phred.score"
       );
     
     print OUT "\n";
@@ -1767,11 +1664,10 @@ sub _determine_heteroplasmy {
             }
             print OUT join "\t",
               (
-                #$result{$loc}->{'chr'},
                 "MT",
                 $convertloc,
-                #$result{$loc}->{'ref'},
                 $convertref,
+		$result{$loc}->{'alt'},
                 $result{$loc}->{'A'},
                 $result{$loc}->{'T'},
                 $result{$loc}->{'C'},
@@ -1780,6 +1676,7 @@ sub _determine_heteroplasmy {
                 $result{$loc}->{'t'},
                 $result{$loc}->{'c'},
                 $result{$loc}->{'g'},
+		$result{$loc}->{"variant_type"},
                 $result{$loc}->{'heteroplasmy'},
                 $result{$loc}->{'lower'},
                 $result{$loc}->{'upper'},
@@ -1795,17 +1692,65 @@ sub _determine_heteroplasmy {
               
               #need to determine whether rCRS  or hg19
               print OUT join "\t",($mitoanno->annotation($convertloc,$convertref,$alt_allele));
+
             #if ( $sb > 0 ) {
                 print OUT "\t", $result{$loc}->{'sb'};
             #}
              print OUT "\t";
              print OUT join "\t",($mitoanno->pathogenic($convertloc));
+       
+            print OUT "\n";
+        }
+ if ( $result{$loc}->{'stat'} == 3 ) {
+            my $convertloc=$loc;
+            my $convertref=$result{$loc}->{'ref'};
+            if($inref ne $outref){ #need to convert genome location
+                  if($inref eq 'hg19' && $outref eq 'rCRS'){
+                        $convertloc=$convert->hg19TorCRS($loc);
+                        $convertref=$convert->rCRSref($convertloc);
+                  }else{
+                        $convertloc=$convert->rCRSTohg19($loc);
+                        $convertref=$convert->hg19ref($convertloc);
+                  }
+                  next if (!defined($convertloc));  #can't be mapped between different assembly
+            }
+            print OUT join "\t",
+              (
+                "MT",
+                $convertloc,
+                $convertref,
+		$result{$loc}->{'alt'},
+                $result{$loc}->{'A'},
+                $result{$loc}->{'T'},
+                $result{$loc}->{'C'},
+                $result{$loc}->{'G'},
+                $result{$loc}->{'a'},
+                $result{$loc}->{'t'},
+                $result{$loc}->{'c'},
+                $result{$loc}->{'g'},
+		$result{$loc}->{"variant_type"},
+                $result{$loc}->{'heteroplasmy'},
+                $result{$loc}->{'lower'},
+                $result{$loc}->{'upper'},
+                $result{$loc}->{'major_allele'},
+                $result{$loc}->{'minor_allele'},
+                $result{$loc}->{'major_allele_count'},
+                $result{$loc}->{'minor_allele_count'}
+              );
+              print OUT "\t";
+              
+              my $alt_allele=$result{$loc}->{'major_allele'};
+              $alt_allele=$result{$loc}->{'minor_allele'} if ($alt_allele eq $convertref); 
+              
+              #need to determine whether rCRS  or hg19
+              print OUT join "\t",($mitoanno->annotation($convertloc,$convertref,$alt_allele));
 
-             # Added on 2013-02-12
+            #if ( $sb > 0 ) {
+                print OUT "\t", $result{$loc}->{'sb'};
+            #}
              print OUT "\t";
-             my $empirical=empirical_bayesian($result{$loc}->{'major_allele_count'},$result{$loc}->{'minor_allele_count'},$hp/100,1000,$A,$B);
-             print OUT join "\t",($rawpvalue{$loc},$adjustpref->{$loc},phred($rawpvalue{$loc}),$empirical,phred(1-$empirical));
-            
+             print OUT join "\t",($mitoanno->pathogenic($convertloc));
+       
             print OUT "\n";
         }
     }
@@ -1890,8 +1835,9 @@ sub _determine_somatic {
     print OUT join "\t",
       (
         "#chr",       "pos",            "ref", "tumorGenotype",
-        "tumorDepth", "normalGenotype", "normalDepth",
-        "Mito.gene","Mito.genedetail\n"
+        "tumorDepth", "tumorHeteroplasmy",     "normalGenotype", 
+	"normalDepth", "normalHeteroplasmy", 
+	"Mito.gene","Mito.genedetail\n"
       );
 
 #Get the overlapped locations and then loop them to determine whether it is a somatic mutation
@@ -1900,69 +1846,64 @@ sub _determine_somatic {
       sort { $a <=> $b } keys %normal;    #numeric sort
     foreach my $loc (@commloc) {
 
-        #Only if normal is not heteroplasmy
         my $normalGeno = "";
         my $normalDP   = "";
         my $tumorGeno  = "";
         my $tumorDP    = "";
         my $issomatic  = 0;
 
-        if ( $normal{$loc}->{'minor_allele_count'} == 0 ) { #though the minor allele in normal is 0, but the major allele in normal and turmor may different
-            if ( $tumor{$loc}->{'minor_allele_count'} == 0 ) {
-#If at this site, both normal and tumor are not heteroplasmy, then determine whether their
-#major_allele is the same
-                if ( $normal{$loc}->{'major_allele'} ne
-                    $tumor{$loc}->{'major_allele'} )
-                {
-                    #a somatic mutation
-                    $issomatic = 1;
-                }
-            }else {
-                if ( $normal{$loc}->{'major_allele'} ne
-                    $tumor{$loc}->{'major_allele'} )
-                {
-#No matter the minor_allele_count meet the cutoff of not, it is already a somatic mutation
-                    $issomatic = 1;
-                }
-                else {
+		#Extra ratios added and equation changed on 140807
 
-       #Only the minor_allele_count meet the cutoff and it is a somatic mutation
-                    my $ratio = 0;
+		    my $ratio1  = 0;
+		    my $ratio2  = 0;
+			#altdiff added 140815
+		    my $altdiff = abs($tumor{$loc}->{'alternate_allele_count'} - $normal{$loc}->{'alternate_allele_count'});
+
                     if ($isall) {
-                        $ratio =
-                          $tumor{$loc}->{'minor_allele_count'} /
+                        $ratio1 =
+                          $tumor{$loc}->{'alternate_allele_count'} /
                           ( sum @{ $tumor{$loc}->{'alleles_count'} } );
-                    }
-                    else {
-                        $ratio =
-                          $tumor{$loc}->{'minor_allele_count'} /
+	                $ratio2 =
+                          $normal{$loc}->{'alternate_allele_count'} /
+                          ( sum @{ $normal{$loc}->{'alleles_count'} } );
+		    }
+		    else {
+                        $ratio1 =
+                          $tumor{$loc}->{'alternate_allele_count'} /
                           ( $tumor{$loc}->{'major_allele_count'} +
                               $tumor{$loc}->{'minor_allele_count'} );
+                        $ratio2 =
+                          $normal{$loc}->{'alternate_allele_count'} /
+                          ( $normal{$loc}->{'major_allele_count'} +
+                              $normal{$loc}->{'minor_allele_count'} );
                     }
-
-                    if (   $ratio > $sp / 100
-                        && $tumor{$loc}->{'minor_allele_count'} > $sa )
+                    if ( abs($ratio1 - $ratio2) > $sp / 100
+			&& $altdiff > $sa )
+			#altdiff added 140815
                     {
                         $issomatic = 1;
-                    }
-                }
-            }
-        }
+		    } 
 
         #Assign this loc to %result
         if ($issomatic) {
-            $normalGeno = $normal{$loc}->{'major_allele'};
-            $normalDP   = $normal{$loc}->{'major_allele_count'};
+            my @nmp = grep { $_ != 0 } @{ $normal{$loc}->{'alleles_count'} };
+            $normalDP   = join "|", @nmp;
+            $normalGeno = join "|", @{ $normal{$loc}->{'alleles'} }[ 0 .. $#nmp ];
+	#modified definitions for $normalDP and $normalGeno on 140807
 
             my @tmp = grep { $_ != 0 } @{ $tumor{$loc}->{'alleles_count'} };
             $tumorDP   = join "|", @tmp;
             $tumorGeno = join "|", @{ $tumor{$loc}->{'alleles'} }[ 0 .. $#tmp ];
-            $result{$loc}->{'ref'}        = $normal{$loc}->{'reference_allele'};
-            $result{$loc}->{'normalGeno'} = $normalGeno;
-            $result{$loc}->{'normalDP'}   = $normalDP;
-            $result{$loc}->{'tumorGeno'}  = $tumorGeno;
-            $result{$loc}->{'tumorDP'}    = $tumorDP;
+            $result{$loc}->{'ref'}                = $normal{$loc}->{'reference_allele'};
+            $result{$loc}->{'normalGeno'}         = $normalGeno;
+            $result{$loc}->{'normalDP'}           = $normalDP;
+            $result{$loc}->{'tumorGeno'}          = $tumorGeno;
+            $result{$loc}->{'tumorDP'}            = $tumorDP;
             
+	    #added 140811
+	    $ratio1=_formatnumeric($ratio1);
+	    $ratio2=_formatnumeric($ratio2);
+
             my $convertloc=$loc;
             my $convertref=$normal{$loc}->{'reference_allele'};
             #my $convertref=$result{$loc}->{'ref'};
@@ -1980,7 +1921,8 @@ sub _determine_somatic {
             print OUT join "\t",
               (
                 "MT", $convertloc, $convertref,
-                $tumorGeno, $tumorDP, $normalGeno, $normalDP
+                $tumorGeno, $tumorDP, $ratio1, $normalGeno, 
+		$normalDP, $ratio2
               );
               my ($genetmp,$genedetailtmp,undef,undef) = $mitoanno->annotation($convertloc);
             print OUT "\t",$genetmp,"\t",$genedetailtmp;
@@ -1990,6 +1932,7 @@ sub _determine_somatic {
     close OUT;
     return %result;
 }
+
 
 #Given a basecall format file, parse it and return a hash table
 #Parameters:
@@ -2016,6 +1959,18 @@ sub _read_basecall {
         my @atcg         = sort { $atcg{$b} <=> $atcg{$a} } keys %atcg;
         my $major_allele = $atcg[0];
         my $minor_allele = $atcg[1];
+	my $alternate_allele;
+	my $totaldepth= $atcg{A} + $atcg{C} + $atcg{T} + $atcg{G} ;
+
+	if ($atcg[0] eq $ref) {
+		$alternate_allele = $atcg[1];
+	} else {
+		$alternate_allele = $atcg[0];
+	}
+
+	#added 140811
+	next if ($totaldepth <= $depth); 
+	#only if total allele count is greater than depth cutoff
 
         $return{$loc}->{'major_allele'}           = $atcg[0];
         $return{$loc}->{'major_allele_count'}     = $atcg{ $atcg[0] };
@@ -2023,6 +1978,7 @@ sub _read_basecall {
         $return{$loc}->{'minor_allele_count'}     = $atcg{ $atcg[1] };
         $return{$loc}->{'reference_allele'}       = $ref;
         $return{$loc}->{'reference_allele_count'} = $atcg{$ref};
+	$return{$loc}->{'alternate_allele_count'} = $atcg{$alternate_allele};
         $return{$loc}->{'alleles'}                = [@atcg];
         $return{$loc}->{'alleles_count'} =
           [ @atcg{@atcg} ];    #Another ways to fetch value from a hash
@@ -2604,9 +2560,9 @@ pre {
                     <li> <a href="#M02">Depth distribution</a></li>
                     <li> <a href="#M03">Template length distribution</a></li>
                 </ol>
-            <li> <a href="#M1">Heteroplasmy</a></li>
+            <li> <a href="#M1">Variants</a></li>
             <li> <a href="#M4">Structural Changes</a></li>
-            <li> <a href="#M2">Somatic Mutation</a></li>
+            <li> <a href="#M2">Heteroplasmic Changes and Somatic Mutations</a></li>
             <li> <a href="#M3">Relative Copy Number Estimation</a></li>
             <li> <a href="#M5">File List</a></li>
         </ul>
@@ -2729,8 +2685,8 @@ HTML
 }
 print OUT <<HTML;
     </div>
-    <div class="module"><h2 id="M1">Heteroplasmy</h2>
-        <p>Heteroplasmy detection threshold is defined on two scales: read count (-ha) and read percentage (-hp). Read count denotes the number of reads we must observe to support heteroplasmy while read percentage denotes the percentage of reads we must observe to support heteroplasmy. Both scales can be used together or individually. The minimum recommended depth requirement (-d) for detecting heteroplasmy is 50. Lower depth will severely damage the confidence of heteroplasmy calling.</p>
+    <div class="module"><h2 id="M1">Variants</h2>
+        <p>Heteroplasmy detection threshold is defined on two scales: read count (-ha) and read percentage (-hp). Read count denotes the number of reads we must observe to support heteroplasmy while read percentage denotes the percentage of reads we must observe to support heteroplasmy. Both scales can be used together or individually. </p>
 HTML
 
     if ($inbam2) {
@@ -2774,9 +2730,9 @@ HTML
 
 print OUT <<HTML;
     </div>
-    <div class="module"><h2 id="M2">Somatic Mutation</h2>
+    <div class="module"><h2 id="M2">Heteroplasmic Changes and Somatic Mutations</h2>
     <p>
-    MitoSeek takes the input bam provided by <b>-i</b> as tumor while the other input bam by <b>-j</b> as its control normal. We propose to compare the empirical allele counts between tumor and normal control directly instead of using a genotype caller. MitoSeek can extract empirical allele count for every mitochondria position then compare the allele counts between tumor and normal to determine somatic mutation status. Two parameters (-sp and -sa) control the somatic mutation detection.
+    MitoSeek takes the input bam provided by <b>-i</b> as tumor while the other input bam by <b>-j</b> as its control normal. The heteroplasmic frequency of both mitochondrial genomes are used to calculate a heteroplasmic frequency difference between the tumor and normal at each position. Only heteroplasmic frequency differences greater than (-sp) will be reported. This allows us to track changes in heteroplasmy as well as somatic mutations.
     </p>
 HTML
     if ($inbam2) {
@@ -2797,7 +2753,7 @@ HTML
     </div>
     <div class="module"><h2 id="M3">Relative Copy Number Estimation</h2>
     <p>
-    Two methods are implemented in MitoSeek to estimate the relative copy number of mithochondria, namely '<b>byRead</b>' and '<b>byDepth</b>'.<br/>
+    Two methods are implemented in MitoSeek to estimate the relative copy number of mitochondria, namely '<b>byRead</b>' and '<b>byDepth</b>'.<br/>
     <h4>byRead</h4>
     <b>CN=Rm/Rt</b>,  where <b>Rm</b> is the reads aligned to mitochondria and passed quality filter and <b>Rt</b> is the total reads passed quality filter. 
     <h4>byDepth</h4>
@@ -3271,5 +3227,4 @@ sub _generate_html_table {
     $html .= "</table>";
     return $html;
 }
-
 
