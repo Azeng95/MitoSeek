@@ -46,8 +46,10 @@ sub changeconfig{
             $self->{_configtemplate} = "$FindBin::Bin/Resources/circos-somatic.template.conf";
         }elsif($var eq "heteroplasmy"){
             $self->{_configtemplate} = "$FindBin::Bin/Resources/circos-heteroplasmy.template.conf";
-        }else{
-            print ERROR "Undefined template, values should be either 'somatic' or 'heteroplasmy'\n";
+	}elsif($var eq "heterodiff"){
+            $self->{_configtemplate} = "$FindBin::Bin/Resources/circos-heterodiff.template.conf";        
+	}else{
+            print ERROR "Undefined template, values should be either 'somatic' or 'heteroplasmy' or 'heterodiff'\n";
             exit(1);
         }
     }
@@ -77,10 +79,10 @@ sub prepare{
     my ($self,$var) = @_;
     
     if(!defined($var)){
-        print ERROR "Undefined value, values should be either 'somatic' or 'heteroplasmy'\n";
+        print ERROR "Undefined value, values should be either 'somatic' or 'heteroplasmy' or 'heterodiff'\n";
         exit(1);
-    }elsif ( $var ne "somatic" && $var ne "heteroplasmy" ){
-        print ERROR "'$var' is not acceptable, values should be either 'somatic' or 'heteroplasmy'\n";
+    }elsif ( $var ne "somatic" && $var ne "heteroplasmy" && $var ne "heterodiff" ){
+        print ERROR "'$var' is not acceptable, values should be either 'somatic' or 'heteroplasmy' or 'heterodiff'\n";
         exit(1);
     }
     
@@ -127,9 +129,9 @@ sub prepare{
         open(IN,$self->{_datafile}) or die $!; <IN>; #skip header
         open(TEXT,">".$self->{_cwd}."/".$self->{_textoutput}) or die $!;
         while(<IN>){
-            my($chr,$pos,$ref,$tumorGeno,$tumorDP,$tumorhetero,$normalGeno,$normalDP,$normalhetero,$mitoGene,$mitoGeneD)=split "\t";
+            my($chr,$pos,$ref,$tumorGeno,$tumorDP,$tumorhetero,$normalGeno,$normalDP,$normalhetero,$gene,$geneD,undef)=split "\t";
             
-	        my $heterodiff = _formatnumeric(abs( $tumorhetero - $normalhetero ));
+	    my $heterodiff = _formatnumeric(abs( $tumorhetero - $normalhetero ));
             my $text="$normalGeno->$tumorGeno:$heterodiff";
            
             print TEXT join "\t",("MT",$pos,$pos,$text);
