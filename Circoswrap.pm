@@ -21,7 +21,7 @@ sub new{
     my($class) = @_;
     my $currentdir=Cwd::getcwd;
     my $self={
-        _build=>"hg19",
+        _build=>"rCRS",
         _circosbin=>"$FindBin::Bin/Resources/circos-0.56/bin/circos",     #where is the circos program
         _karyotype=>"$FindBin::Bin/Resources/hg19_karyotype_MT.txt",   #Tell where is the karyotype file of mitochondrial genome
         _genehighlight=>"$FindBin::Bin/Resources/hg19_genes_MT.highlights.txt",  #genes in mitochondrial, by highlight
@@ -187,7 +187,7 @@ sub build{
     my ($self,$var) = @_;
     if(defined($var)){
         if($var ne "hg19" && $var ne "rCRS"){
-            warn "Only 'hg19' and 'rCRS' are accepted for mitochondria genome, will use 'hg19' as default\n";
+            warn "Only 'hg19' and 'rCRS' are accepted for mitochondria genome, will use 'rCRS' as default\n";
         }else{
             $self->{_build}=$var;
             $self->{_karyotype}="$FindBin::Bin/Resources/".$var."_karyotype_MT.txt";
