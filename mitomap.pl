@@ -4,6 +4,12 @@
 # Email:  riverlee2008@gmail.com
 # Date:   Wed Feb 13 10:00:36 2013
 ###################################
+#Edited By: Andy Zeng
+#Email: azeng95@gmail.com
+#Date: April 26th, 2015
+#BC Genome Sciences Centre
+#############################################
+
 use strict;
 use warnings;
 
@@ -17,7 +23,7 @@ my $samtools    = "$FindBin::Bin/Resources/samtools/samtools";   #Where is the s
 my $bwa         = "$FindBin::Bin/Resources/bwa/bwa";
 
 # Default parameters
-my $mmq         = 20;   #minimal mapping quanlity
+my $mmq         = 20;   #minimal mapping quality
 my $inbam;
 my $mitobed;
 my $bwaindex;
@@ -66,10 +72,10 @@ info("Removing those remapped reads and get the finial mitochondrial read ...",1
 get_final_mito_bam($tempfiles{'mitobam1'},$tempfiles{'mitobam2'},$outbam);
 
 
-# remvoe the tempfiles
+# remove the tempfiles
 END{
     foreach my $k (%tempfiles){
-        if(-e $tempfiles{$k}){
+        if(exists $tempfiles{$k}){
             unlink $tempfiles{$k};
         }
     }
@@ -116,7 +122,7 @@ sub get_final_mito_bam{
     close IN;
 
     #Conver to bam
-    my $comm = "$samtools view -bS $tmpsam > $out";
+    my $comm = "$samtools view -bS $tmpsam > $out 2>/dev/null";
     run($comm);
     unlink $tmpsam;
 }
@@ -130,21 +136,21 @@ sub get_final_mito_bam2{
 sub bwa_map_bam{
     my($in,$index,$paired,$singlesai,$pairsai1,$pairsai2,$outsam,$out) = @_;
     if($paired){
-        my $comm="bwa aln -b1 $index $in > $pairsai1";
+        my $comm="$bwa aln -b1 $index $in > $pairsai1 2>/dev/null";
         run($comm);
-        $comm="bwa aln -b2 $index $in >$pairsai2";
+        $comm="$bwa aln -b2 $index $in >$pairsai2 2>/dev/null";
         run($comm);
-        $comm="bwa sampe $index $pairsai1 $pairsai2 $in $in >$outsam";
+        $comm="$bwa sampe $index $pairsai1 $pairsai2 $in $in >$outsam 2>/dev/null";
         run($comm);
-        $comm="$samtools view -bS $outsam>$out";
+        $comm="$samtools view -bS $outsam>$out 2>/dev/null";
         run($comm);
 
     }else{
-        my $comm="bwa aln -b $index $in>$singlesai";
+        my $comm="$bwa aln -b $index $in>$singlesai 2>/dev/null";
         run($comm);
-        $comm="bwa samese $index $singlesai $in >$outsam";
+        $comm="$bwa samse $index $singlesai $in >$outsam 2>/dev/null";
         run($comm);
-        $comm="$samtools view -bS $outsam>$out";
+        $comm="$samtools view -bS $outsam>$out 2>/dev/null";
         run($comm);
     }
 }
@@ -153,7 +159,7 @@ sub bwa_map_bam{
 # Give a bed file, extract reads in this region
 sub get_mito_bam{
     my ($in,$mbed,$mmq,$out) = @_;
-    my $comm="$samtools view -b -q $mmq -L $mbed $in>$out";
+    my $comm="$samtools view -b -q $mmq -L $mbed $in>$out 2>/dev/null";
     run($comm);
 }
 
@@ -173,7 +179,7 @@ sub determine_paired{
 
     my $count=0;
     my $flag_paired=0x0001;
-    my $isparied=0;
+    my $ispaired=0;
 
     while(<IN>){
         s/\r|\n//g;
@@ -182,7 +188,7 @@ sub determine_paired{
             $rnext, $pnext, $tlen,  $seq, $qual, $others
         ) = split "\t";
         if ( $flag & $flag_paired ) {
-            $isparied = 1;
+            $ispaired = 1;
             last;
         }
         if($count>100){
@@ -190,7 +196,7 @@ sub determine_paired{
         }                            
     }
     close IN;
-    return ($isparied);
+    return ($ispaired);
 }
 
 # Check variables
