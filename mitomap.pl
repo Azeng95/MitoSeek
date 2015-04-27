@@ -62,8 +62,8 @@ my %tempfiles=("mitobam1"=>"mito_step1.bam",          #extracted mapped reads in
 info("Extracting mapped reads on mitochondria ...",1);
 get_mito_bam($inbam,$mitobed,$mmq,$tempfiles{'mitobam1'});
 
-# Step 2, Remap mitoreads to non-mitochondrial human reference
-info("Remapping those reads to non-mitochondria human genome ...",1);
+# Step 2, Remap mitoreads to rCRS reference
+info("Remapping those reads to the rCRS ...",1);
 bwa_map_bam($tempfiles{'mitobam1'},$bwaindex,$paired,$tempfiles{'single_sai'},$tempfiles{'pair_sai1'},
             $tempfiles{'pair_sai2'},$tempfiles{'mitosam2'},$tempfiles{'mitobam2'});
 
