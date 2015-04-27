@@ -68,7 +68,7 @@ bwa_map_bam($tempfiles{'mitobam1'},$bwaindex,$paired,$tempfiles{'single_sai'},$t
             $tempfiles{'pair_sai2'},$tempfiles{'mitosam2'},$tempfiles{'mitobam2'});
 
 # Step 3, Remove those could be remapped to non-mitochondria human genome
-info("Removing those remapped reads and get the finial mitochondrial read ...",1);
+info("Removing unmapped reads and getting the final mitochondrial reads ...",1);
 get_final_mito_bam($tempfiles{'mitobam1'},$tempfiles{'mitobam2'},$outbam);
 
 
@@ -87,19 +87,18 @@ sub get_final_mito_bam{
     # Read mapped read name in remappedbam file and store it in %hash
     my %hash;
     open(IN,"$samtools view $remappedbam|") or die $!;
-    my $flag_read_unmapped=0x0004;
     while(<IN>){
         s/\r|\n//g;
         my (
             $qname, $flag,  $rname, $pos, $mapq, $cigar,
             $rnext, $pnext, $tlen,  $seq, $qual, $others
         ) = split "\t";
-        next if($flag & $flag_read_unmapped); #read not mapped
+        next if($flag != 0x0004); #read mapped
         $hash{$qname}++;
     }
     close IN;
     
-    # Read initialbam and remove those remapped
+    # Read initialbam and remove unmapped reads
     open(IN,"$samtools view -h $initalbam|") or die $!;
     my $tmpsam="${initalbam}.tmp.sam";
     open(TMP,">$tmpsam") or die $!;
@@ -127,18 +126,12 @@ sub get_final_mito_bam{
     unlink $tmpsam;
 }
 
-sub get_final_mito_bam2{
-    my($initalbam,$remappedbam,$out) = @_;
-    my $comm="$intersectBed -abam $initalbam -bbam $remappedbam -v > $out";
-    run($comm);
-}
-
 sub bwa_map_bam{
     my($in,$index,$paired,$singlesai,$pairsai1,$pairsai2,$outsam,$out) = @_;
     if($paired){
-        my $comm="$bwa aln -b1 $index $in > $pairsai1 2>/dev/null";
+        my $comm="$bwa aln $index -b1 $in > $pairsai1 2>/dev/null";
         run($comm);
-        $comm="$bwa aln -b2 $index $in >$pairsai2 2>/dev/null";
+        $comm="$bwa aln $index -b2 $in >$pairsai2 2>/dev/null";
         run($comm);
         $comm="$bwa sampe $index $pairsai1 $pairsai2 $in $in >$outsam 2>/dev/null";
         run($comm);
