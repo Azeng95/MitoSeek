@@ -88,12 +88,12 @@ Usage: perl mitoSeek.pl -i inbam
 -bwa [bwa]              Tell where is the bwa program
                         Default = your mitoseek directory/Resources/bwa-0.7.5a/bwa
 -bwaindex [bwaindex]    Tell where is the bwa index of non-mitochondrial human genome
-                        default is your mitoseek directory/Resources/bwa-0.7.5a/rCRS/rCRS.fa
+                        Default = your mitoseek directory/Resources/bwa-0.7.5a/rCRS/rCRS.fa
 -advance                Ensures that mitochondrial genome is aligned to rCRS and not hg19, two step process: 
-		                  	  1) Initially extract mitochrodrial reads from a bam file 
-			                    2) Remapping those reads to the rCRS. 
-			                    Advanced extraction needs -bwaindex option. 
-			                  Default = off.
+		        1) Initially extract mitochrodrial reads from a bam file 
+			2) Remapping those reads to the rCRS. 
+			Advanced extraction needs -bwaindex option. 
+			Default = off.
 ```
 
 <a name="change"/>
