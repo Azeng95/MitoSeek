@@ -43,37 +43,57 @@ Usage: perl mitoSeek.pl -i inbam
 -i [bam]                Input bam file
 -j [bam]                Input bam file2, if this file is provided, it will conduct somatic mutation mining, and it will be 
                         taken as normal tissue.
--t [input type]         Type of the bam files, the possible choices are 1=exome, 2=whole genome, 3= RNAseq, 4 = mitochondria only,default = 1
+-t [input type]         Type of the bam files, the possible choices are 1=exome, 2=whole genome, 3= RNAseq, 4 = mitochondria only 
+                        Default = 1
 -d [int]                The minimum recommended depth requirement for detecting heteroplasmy. Lower depth will severely damage the 
-                        confidence of heteroplasmy calling, default=50
+                        confidence of heteroplasmy calling
+                        Default = 10
 -ch                     Produce circos plot input files and circos plot figure for heteroplasmic mutation,
-                        (-noch to turn off and -ch to turn on), default = on
--hp [int]               Heteroplasmy threshold using [int] percent alternative allele observed, default = 5
--ha [int]               Heteroplasmy threshold using [int] allele observed, default = 0
+                        (-noch to turn off and -ch to turn on)
+                        Default = on
+-hp [int]               Heteroplasmy threshold using [int] percent alternative allele observed
+                        Default = 5
+-ha [int]               Heteroplasmy threshold using [int] allele observed
+                        Default = 10
 -A                      If - A is used, the total read count is the total allele count of all allele observed. 
-                        Otherwise, the total read count is the sum of major and minor allele counts. Default = off
--mmq [int]              Minimum map quality, default =20
--mbq [int]              Minimum base quality, default =20
+                        Otherwise, the total read count is the sum of major and minor allele counts. 
+                        Default = on
+-mmq [int]              Minimum map quality
+                        Default =20
+-mbq [int]              Minimum base quality
+                        Default =20
 -cn                     Estimate relative copy number of input bam(s), does not work with mitochondria targeted sequencing bam files,
-                        (-noch to turn off and -ch to turn on) default = off.
--sp [int]               Somatic mutation detection threshold,int = percent of alternative allele observed in tumor, default int=5
--sa [int]               Somatic mutation detection threshold,int = number of alternative allele observed in tumor, default int=3
+                        (-noch to turn off and -ch to turn on) 
+                        Default = off.
+-sp [int]               Somatic mutation detection threshold,int = percent of alternative allele observed in tumor
+                        Default = 5
+-sa [int]               Somatic mutation detection threshold,int = number of alternative allele observed in tumor
+                        Default = 10
 -cs                     Produce circos plot input files and circos plot figure for somatic mutation, 
-                        (-nocs to turn off and -cs to turn on), default = off
--r [ref]                The reference used in the bam file, the possible choices are hg19 and rCRS, default=hg19
--R [ref]                The reference used in the output files, the possible choices are hg19 and rCRS, default=hg19
+                        (-nocs to turn off and -cs to turn on)
+                        Default = on
+-r [ref]                The reference used in the bam file, the possible choices are hg19 and rCRS
+                        Default = rCRS
+-R [ref]                The reference used in the output files, the possible choices are hg19 and rCRS
+                        Default = rCRS
 -str [int]              Structure variants cutoff for those discordant mapping mates, 
-                        int = number of spanning reads supporting this structure variants, default = 2
--strf [int]             Structure variants cutoff for those large deletions,
-                        int = template size in bp, default=500
--QC                     Produce QC result, (--noQC to turn off and -QC to turn on), default=on
--samtools[samtools]     Tell where is the samtools program, default is your mitoseek directory/Resources/samtools/samtools
--bwa [bwa]              Tell where is the bwa program, default value is 'bwa' which is in your $PATH
--bwaindex [bwaindex]    Tell where is the bwa index of non-mitochondrial human genome, no default value
--advance                Will get mitochondrial reads in an advanced way, generally followed by 1) Initially extract mitochrodrial reads from 
-                        a bam file, then 2) remove those could be remapped to non-mitochondrial human genome by bwa. Advanced extraction needs 
-                        -bwaindex option. Default extraction without removing step.
-
+                        int = number of spanning reads supporting this structure variants
+                        Default = 2
+-strf [int]             Structure variants cutoff for those large deletions (int = template size in bp)
+                        Default = 500
+-QC                     Produce QC result, (--noQC to turn off and -QC to turn on)
+                        Default = on
+-samtools[samtools]     Tell where is the samtools program
+                        Default = your mitoseek directory/Resources/samtools/samtools
+-bwa [bwa]              Tell where is the bwa program
+                        Default = your mitoseek directory/Resources/bwa-0.7.5a/bwa
+-bwaindex [bwaindex]    Tell where is the bwa index of non-mitochondrial human genome
+                        default is your mitoseek directory/Resources/bwa-0.7.5a/rCRS/rCRS.fa
+-advance                Ensures that mitochondrial genome is aligned to rCRS and not hg19, two step process: 
+		                  	  1) Initially extract mitochrodrial reads from a bam file 
+			                    2) Remapping those reads to the rCRS. 
+			                    Advanced extraction needs -bwaindex option. 
+			                  Default = off.
 ```
 
 <a name="change"/>
