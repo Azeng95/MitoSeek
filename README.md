@@ -6,12 +6,9 @@ Table of Content
    * [Release version 1.2 on Jan 15, 2014] (#v1.2)
    * [Release version 1.1 on Feb 15, 2013] (#v1.1)
    * [Release version 1.0 on Dec 14, 2012] (#v1.0)
-* [Statistical framework for heteroplasmy detection](#statistics)
-   * [Fisher's exact test](#fisher)
-   * [Empirical Bayesian for Binomial proportion with conjugate Beta prior] (#bayes)
 * [Prerequisites](#Prerequisites)
-  * [Step1: Intall perl packages required by circos] (#step1)
-  * [Step2: Intall perl packages required by MitoSeek] (#step2)
+  * [Step1: Install perl packages required by circos] (#step1)
+  * [Step2: Install perl packages required by MitoSeek] (#step2)
   * [Step3: Build samtools] (#step3)
 * [Others] (#Others)
   * [Configure your perl environment] (#perlsetup)
@@ -118,67 +115,6 @@ Initial version for the paper
 
 * **[Download Zip](https://github.com/riverlee/MitoSeek/archive/964cd2e61735a60283f0280020cadbb53be3617e.zip)**
 * **[Browse Code ] (https://github.com/riverlee/MitoSeek/tree/964cd2e61735a60283f0280020cadbb53be3617e)**
-
-<a name="statistics"/>
-Statistical framework for heteroplasmy detection
------------------------------------------------------------------
-We have implemented statistical framework in addition to the empirical filters. We added a function to perform a one-tail Fisher’s exact test to determine if the rate of heteroplasmy is significantly greater than user defined cutoff (-hp). Moreover, MitoSeek also provides Phred quality scores based on the p-value.
-
-
-<a name="fisher"/>
-### Fisher's exact test
-```bash
-           major   minor    
-observed    n11     n12 | n1p 
-expected    n21     n22 | n2p   
-           -----------------
-            np1     np2   npp
-where n11 and n12 are observed number of major and minor alleles,
-n21 = (n11+n12)*(1-hp/100) in which hp is defined by -hp
-n22 = (n11+n12)*hp/100  in which hp is defined by -hp
-```
-
-The phred score of heteroplasmy for Fisher's exact test calucated as
-
-```
-phred.score.fisher = - log10 * log10(fisher.pvalue)
-```
-
-<a name="bayes"/>
-### Empirical Bayesian for Binomial proportion with conjugate Beta prior
-
-```
-                                      hp          
-                                    _ ---         
-                                   /  100         
-likelihood.of.heteroplasmy =  1 -  |      f(x) dx 
-                                  _/  0           
-
-
-```
-
-where
-
-```
-                        1             a  + n12 - 1         b  + n11 - 1  
-f(x) =  -------------------------- * x            * (1 - x)
-        beta(n12 +  a ,n11 +  b )                             
-                                                                     
-
-```
-
-**_a_** and **_b_** are share parameters of Beta prior distribution, which are  estimated from 600 BRCA samples.
-
-
-The phred score of heteroplasmy for Empirical Bayesian approach is calculated as
-
-```
-phred.score.empirical = - log10 * log10(1 - likelihood.of.heteroplasmy)
-
-
-```
-
-
 
 
 <a name="Prerequisites"/>
