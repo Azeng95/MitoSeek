@@ -50,13 +50,10 @@ Usage: perl mitoSeek.pl -i inbam
                         (-noch to turn off and -ch to turn on), default = on
 -hp [int]               Heteroplasmy threshold using [int] percent alternative allele observed, default = 5
 -ha [int]               Heteroplasmy threshold using [int] allele observed, default = 0
--alpha [float]          Shape1 parameter of Beta prior distribution, default is 3.87 which is estimated from 600 BRCA samples
--beta  [float]          Shape2 parameter of Beta prior distribution, default is 174.28, which is estimated from 600 BRCA samples
 -A                      If - A is used, the total read count is the total allele count of all allele observed. 
                         Otherwise, the total read count is the sum of major and minor allele counts. Default = off
 -mmq [int]              Minimum map quality, default =20
 -mbq [int]              Minimum base quality, default =20
--sb [int]               Remove all sites with strand bias score in the top [int] %, default = 10 
 -cn                     Estimate relative copy number of input bam(s), does not work with mitochondria targeted sequencing bam files,
                         (-noch to turn off and -ch to turn on) default = off.
 -sp [int]               Somatic mutation detection threshold,int = percent of alternative allele observed in tumor, default int=5
