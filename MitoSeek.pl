@@ -112,6 +112,7 @@ my $mitodepth2                         = "mito2_depth.txt";
 my $sampledepthi                       = "sample_i_depth.txt";  #store depth of imput sample1 
 my $sampledephtj                       = "sample_j_depth.txt";
 my $mitosomatic                        = "mito_somatic_mutation.txt";
+my $mitoheterodiff		       = "mito_heteroplasmic_changes.txt";
 my $mitoreport                         = "mitoSeek.html";
 
 #circos related
@@ -126,6 +127,9 @@ my $mitoheteroplasmyscatteroutput2     = "mito2_heteroplasmy_circos.scatter.txt"
 my $mitocircossomaticfigure            = "mito_somatic_mutation_circos.png";
 my $mitocircossomaticconfig            = "mito_somatic_mutation_circos.config";
 my $mitosomatictextoutput              = "mito_somatic_mutation_circos.text.txt";
+my $mitocircosheterodifffigure         = "mito_heteroplasmic_changes_circos.png";
+my $mitocircosheterodiffconfig         = "mito_heteroplasmic_changes_circos.config";
+my $mitoheterodifftextoutput           = "mito_heteroplasmic_changes_circos.text.txt";
 
 my $mitooffset1                        = 33;                            #Not used currently
 my $mitooffset2                        = 33;
@@ -148,23 +152,23 @@ my $type              = 1;          #1=exome, 2=whole genome, 3= RNAseq, 4 = mit
 #my $saveallelecount   = 1;          #-a
 my $producecircosplot = 1;          #-ch, produce circos plot for heteroplasmic mutation
 my $hp                = 5;          #-hp, heteroplasmy threshold using [int] percent alternatie allele observed, default=5;
-my $ha                = 10;          #-ha, heteroplasmy threshold using [int] allele observed, default=10;
+my $ha                = 10;         #-ha, heteroplasmy threshold using [int] allele observed, default=10;
 my $depth             = 10;         #The minimum recommended depth requirement for detecting heteroplasmy and somatic mutations is 10. Low depth will severely damage the confidence of heteroplasmy and somatic mutation calling
 my $isall             = 1;          #If - A is used, the total read count is the total allele count of all allele observed. Otherwise, the total read count is the sum of major and minor allele counts. Default = on
 my $mmq               = 20;         #minimum map quality, default=20
 my $mbq               = 20;         #minimum base quality, default=20
-my $sb                = 10;          #remove all sites with strand bias score in the top [int] %, default=10;
+my $sb                = 10;         #remove all sites with strand bias score in the top [int] %, default=10;
 my $cn                = 0;          #Estimate relative copy number of input bam(s),does not work with mitochondria targeted sequencing bam files
-my $sp                = 5;          #somatic mutation detection threshold, [int]% of change in heteroplasmy in tumor, default=5;
-my $sa                = 10;          #somatic mutation detection threshold, int number of alternative allele observed in tumor. default=10
+my $sp                = 5;         #somatic mutation detection threshold, [int]% of change in heteroplasmy in tumor, default=$hp
+my $sa                = 10;          #somatic mutation detection threshold, int number of alternative allele observed in tumor. default=$ha
 my $cs                = 1;          #Produce circos plot input files and circos plot figure for somatic mutations
 my $regionbed         = undef;      #A bed file that contains the regions mitoSeek will perform analysis on
-my $inref             = 'hg19';     #The reference used in the input bam files
+my $inref             = 'rCRS';     #The reference used in the input bam files
 my $outref            = 'rCRS';     #The output files used in the reference
 my $qc                = 1;          #Produce QC result
 my $str               = 2;          #structure variants cutoff, this cutoff applied to >$str mates supporting this cross different chromosome mapping
 my $strflagmentsize   = 500;        #structure variants cutoff for those abnormal large delete/insertion
-my $advance           = 0;          #if set 1, need to remove those mito reads could be remapped to non-mitochondria human genome
+my $advance           = 0;          #if set 1, remap the reads onto the rCRS
 my $bwaindex          = undef;
 my $bwa               = "bwa";      #suppose you have bwa install in your $PATH
 my $help              =0;
@@ -299,7 +303,7 @@ sub _check{
     }
 
     if ($cn && $type==4){
-        _error("Your input bam is mitochondria only (-t), could not conduct the relative cony number estimation (-cn)\n");
+        _error("Your input bam is mitochondria only (-t), could not conduct the relative copy number estimation (-cn)\n");
         _usage(1);
     }
 
@@ -361,6 +365,8 @@ sub _print_analysis_steps{
         print "    ",$index++,".2,Detecting structure variants from '$mitobam2' (Output: $mitostructure2 | $mitostructuredeletion2)\n";
         
         print "    ",$index++,",Detecting somatic mutations (Output: $mitosomatic)\n";
+
+        print "    ",$index++,",Detecting heteroplasmic changes (Output: $mitoheterodiff)\n";
         
          if($cn && $type !=4){
             print "    ",$index,".1,Estimating relative copy number of '$mitobam1' (Output: $mitocnv1)\n";
@@ -514,8 +520,23 @@ sub _main{
             $circos->prepare("somatic");
             $circos->plot();
          }
-         
-          if($cn && $type!=4){
+    
+	_info($index++.",Detecting heteroplasmic changes (Output: $mitoheterodiff)"); 
+	_determine_heterodiff( $mitobasecall1, $mitobasecall2, $sp, $sa, $isall,$mitoheterodiff );
+
+	 if($cs){
+            $circos->build($outref);
+            $circos->changeconfig("heterodiff");
+            $circos->circosoutput($mitocircosheterodifffigure);
+            $circos->configoutput($mitocircosheterodiffconfig);
+            $circos->datafile($mitoheterodiff);
+            $circos->textoutput($mitoheterodifftextoutput);
+            $circos->cwd(getcwd()."/circos");
+            $circos->prepare("heterodiff");
+            $circos->plot();
+         }
+
+         if($cn && $type!=4){
             _info($index++.",Estimating relative copy number of '$mitobam1' (Output: $mitocnv1)");
             _wrap_mito_cnv($mitobam1,$inbam1,$mitobases,$totalbases,$isbam,$mbq,$mmq,$totalbed,$mitodepth1,$sampledepthi,$mitocnv1);
             _info($index++.",Estimating relative copy number of '$mitobam2' (Output: $mitocnv2)");
@@ -921,7 +942,7 @@ Usage: perl mitoSeek.pl -i inbam
 -sa [int] Somatic mutation detection threshold,int = number of alternative allele observed in tumor, default int=10
 -cs                     Produce circos plot input files and circos plot figure for somatic mutation, 
                         (-nocs to turn off and -cs to turn on), default = off
--r [ref]                The reference used in the bam file, the possible choices are hg19 and rCRS, default=hg19
+-r [ref]                The reference used in the bam file, the possible choices are hg19 and rCRS, default=rCRS
 -R [ref]                The reference used in the output files, the possible choices are hg19 and rCRS, default=rCRS
 -str [int]              Structure variants cutoff for those discordant mapping mates, 
                         int = number of spanning reads supporting this structure variants, default = 2
@@ -1457,7 +1478,7 @@ sub _determine_variants {
             $reverse_T, $reverse_C, $reverse_G
         ) = split "\t";
 	
-	#added 140827
+	#Even if the user chooses not to realign to the rCRS, this will ensure that the variants are reported in rCRS locations. 
             my $convertloc=$loc;
             my $convertref=$ref;
             if($inref ne $outref){ #need to convert genome location
@@ -1471,7 +1492,6 @@ sub _determine_variants {
 
                   next if (!defined($convertloc));  #can't be mapped between different assembly
             }
-	#added 140827
 
         # Get the major allele and minor allele.
         my %atcg;
@@ -1525,23 +1545,19 @@ sub _determine_variants {
             ( $lower, $upper ) = _ci( $heteroplasmy, $n );
         }
 
-        #Stat values could be
+         #Stat values could be
         #0 (not a variant)
         #1 (show variant alleles, but does not pass the cutoff) (hp,ha,depth)
         #2 (heteroplasmic variant)
         #3 (homoplasmic variant)
         my $stat = 0;
         if ( $heteroplasmy > 0 ) {
-
 	    if ( $alternate_allele eq $major_allele && $atcg{$minor_allele} < $ha ) {
 		$stat = 3;
-	    } else {
-                if ( $maf > $hp / 100 && $atcg{$minor_allele} > $ha ) {  #use $depth which is not passed by function
+	    } elsif ( $maf > $hp / 100 && $atcg{$minor_allele} > $ha ) { #use $depth which is not passed by function
                     $stat = 2;
-                }
-                else {
+            } else {
                     $stat = 1;
-            	}
 	    }
         }
 
@@ -1877,11 +1893,15 @@ sub _determine_somatic {
                           ( $normal{$loc}->{'major_allele_count'} +
                               $normal{$loc}->{'minor_allele_count'} );
                     }
-                    if ( abs($ratio1 - $ratio2) > $sp / 100
-			&& $altdiff > $sa )
-			#altdiff added 140815
-                    {
-                        $issomatic = 1;
+		        #if heteroplasmic difference (and empirical count) pass the cutoffs, assess to make sure that normal is a homoplasmy. 
+		        #if tumor is also a homoplasmy and the Tumor Major Allele = Normal Major allele, it is not a somatic mutation. 
+		        #this is really just a safeguard in case depth filters are abnormally low
+                    if ((abs($ratio1-$ratio2) > $sp/100 && $altdiff > $sa) and ($ratio2 < $sp/100 || $normal{$loc}->{'minor_allele_count'} < $sa)){
+			if( $ratio1 < $sp/100 || $tumor{$loc}->{'minor_allele_count'} < $sa && $tumor{$loc}->{'major_allele'} eq $normal{$loc}->{'major_allele'}) {
+			    $issomatic = 0;
+			}else{
+			    $issomatic = 1;
+			}
 		    } 
 
         #Assign this loc to %result
@@ -1900,7 +1920,6 @@ sub _determine_somatic {
             $result{$loc}->{'tumorGeno'}          = $tumorGeno;
             $result{$loc}->{'tumorDP'}            = $tumorDP;
             
-	    #added 140811
 	    $ratio1=_formatnumeric($ratio1);
 	    $ratio2=_formatnumeric($ratio2);
 
@@ -1933,6 +1952,121 @@ sub _determine_somatic {
     return %result;
 }
 
+#Entire heterodiff section added 150120
+#Given two basecall files and then determine the heteroplasmic changes
+#The first input basecall file is tumor sample while the second input basecall is normal sample
+#Parameters:
+#$tumorbase  tumor basecall input file
+#$normalbase normal basecall input file
+#$sp  (-sp) cutoff used in determine heteroplasmic change, means % of alternative allele observed in tumor (same as somatic)
+#$sa  (-sa) cutoff used in determine heteroplasmic change, means number of alternative allele observed in tumor (same as somatic)
+#$isall   (-A)  0/1, 1 denotes that the total read count is the total allele count of all allele observed,
+#         while 0 indicates the total read count is the sum of major and minor allele counts, default=0
+sub _determine_heterodiff {
+    my ( $tumorbase, $normalbase, $sp, $sa, $isall, $heterodiffoutput ) = @_;
+    my %tumor  = _read_basecall($tumorbase);
+    my %normal = _read_basecall($normalbase);
+
+    my %result;
+    open( OUT, ">$heterodiffoutput" ) or die $!;
+    print OUT join "\t",
+      (
+        "#chr",       "pos",            "ref", "tumorGenotype",
+        "tumorDepth", "tumorHeteroplasmy",     "normalGenotype", 
+	"normalDepth", "normalHeteroplasmy", 
+	"Mito.gene","Mito.genedetail\n"
+      );
+
+#Get the overlapped locations and then loop them to determine whether it is a heteroplasmic change
+    my @commloc =
+      grep { exists( $tumor{$_} ) }
+      sort { $a <=> $b } keys %normal;    #numeric sort
+    foreach my $loc (@commloc) {
+
+        my $normalGeno = "";
+        my $normalDP   = "";
+        my $tumorGeno  = "";
+        my $tumorDP    = "";
+        my $heterodiff = 0;
+
+		#Extra ratios added and equation changed on 140807
+
+		    my $ratio1  = 0;
+		    my $ratio2  = 0;
+			#altdiff added 140815
+		    my $altdiff = abs($tumor{$loc}->{'alternate_allele_count'} - $normal{$loc}->{'alternate_allele_count'});
+
+                    if ($isall) {
+                        $ratio1 =
+                          $tumor{$loc}->{'alternate_allele_count'} /
+                          ( sum @{ $tumor{$loc}->{'alleles_count'} } );
+	                $ratio2 =
+                          $normal{$loc}->{'alternate_allele_count'} /
+                          ( sum @{ $normal{$loc}->{'alleles_count'} } );
+		    }
+		    else {
+                        $ratio1 =
+                          $tumor{$loc}->{'alternate_allele_count'} /
+                          ( $tumor{$loc}->{'major_allele_count'} +
+                              $tumor{$loc}->{'minor_allele_count'} );
+                        $ratio2 =
+                          $normal{$loc}->{'alternate_allele_count'} /
+                          ( $normal{$loc}->{'major_allele_count'} +
+                              $normal{$loc}->{'minor_allele_count'} );
+                    }
+                    if ( (abs($ratio1 - $ratio2) > $sp / 100 && $altdiff > $sa) 
+			and ($ratio1 > $sp / 100 && $normal{$loc}->{'minor_allele_count'} > $sa))
+                    {
+                        $heterodiff = 1;
+		    } 
+
+        #Assign this loc to %result
+        if ($heterodiff) {
+            my @nmp = grep { $_ != 0 } @{ $normal{$loc}->{'alleles_count'} };
+            $normalDP   = join "|", @nmp;
+            $normalGeno = join "|", @{ $normal{$loc}->{'alleles'} }[ 0 .. $#nmp ];
+	#modified definitions for $normalDP and $normalGeno on 140807
+
+            my @tmp = grep { $_ != 0 } @{ $tumor{$loc}->{'alleles_count'} };
+            $tumorDP   = join "|", @tmp;
+            $tumorGeno = join "|", @{ $tumor{$loc}->{'alleles'} }[ 0 .. $#tmp ];
+            $result{$loc}->{'ref'}                = $normal{$loc}->{'reference_allele'};
+            $result{$loc}->{'normalGeno'}         = $normalGeno;
+            $result{$loc}->{'normalDP'}           = $normalDP;
+            $result{$loc}->{'tumorGeno'}          = $tumorGeno;
+            $result{$loc}->{'tumorDP'}            = $tumorDP;
+            
+	    $ratio1=_formatnumeric($ratio1);
+	    $ratio2=_formatnumeric($ratio2);
+
+            my $convertloc=$loc;
+            my $convertref=$normal{$loc}->{'reference_allele'};
+            #my $convertref=$result{$loc}->{'ref'};
+            if($inref ne $outref){ #need to convert genome location
+                  if($inref eq 'hg19' && $outref eq 'rCRS'){
+                        $convertloc=$convert->hg19TorCRS($loc);
+                        $convertref=$convert->rCRSref($convertloc);
+                  }else{
+                        $convertloc=$convert->rCRSTohg19($loc);
+                        $convertref=$convert->hg19ref($convertloc);
+                  }
+                  next if (!defined($convertloc));  #can't be mapped between different assembly
+            }
+                        
+            print OUT join "\t",
+              (
+                "MT", $convertloc, $convertref,
+                $tumorGeno, $tumorDP, $ratio1, $normalGeno, 
+		$normalDP, $ratio2
+              );
+              my ($genetmp,$genedetailtmp,undef,undef) = $mitoanno->annotation($convertloc);
+            print OUT "\t",$genetmp,"\t",$genedetailtmp;
+            print OUT "\n";
+        }
+    }
+    close OUT;
+    return %result;
+}
 
 #Given a basecall format file, parse it and return a hash table
 #Parameters:
@@ -1968,7 +2102,6 @@ sub _read_basecall {
 		$alternate_allele = $atcg[0];
 	}
 
-	#added 140811
 	next if ($totaldepth <= $depth); 
 	#only if total allele count is greater than depth cutoff
 
@@ -2730,9 +2863,9 @@ HTML
 
 print OUT <<HTML;
     </div>
-    <div class="module"><h2 id="M2">Heteroplasmic Changes and Somatic Mutations</h2>
+    <div class="module"><h2 id="M2">Somatic Mutations</h2>
     <p>
-    MitoSeek takes the input bam provided by <b>-i</b> as tumor while the other input bam by <b>-j</b> as its control normal. The heteroplasmic frequency of both mitochondrial genomes are used to calculate a heteroplasmic frequency difference between the tumor and normal at each position. Only heteroplasmic frequency differences greater than (-sp) will be reported. This allows us to track changes in heteroplasmy as well as somatic mutations.
+    MitoSeek takes the input bam provided by <b>-i</b> as tumor while the other input bam by <b>-j</b> as its control normal. The heteroplasmic frequency of both mitochondrial genomes are used to calculate a heteroplasmic frequency difference between the tumor and normal at each position. Only samples with heteroplasmic frequency differences greater than (-sp) and are homoplasmic for their normal alleles will be reported. 
     </p>
 HTML
     if ($inbam2) {
@@ -2744,6 +2877,27 @@ HTML
 HTML
         }
         print OUT _generate_html_table($mitosomatic);
+    }
+    else {
+        print OUT "NA\n";
+    }
+
+print OUT <<HTML;
+    </div>
+    <div class="module"><h2 id="M2">Heteroplasmic Changes</h2>
+    <p>
+    MitoSeek takes the input bam provided by <b>-i</b> as tumor while the other input bam by <b>-j</b> as its control normal. The heteroplasmic frequency of both mitochondrial genomes are used to calculate a heteroplasmic frequency difference between the tumor and normal at each position. Only heteroplasmic frequency differences greater than (-sp) will be reported and are heteroplasmic for their normal alleles. This allows us to track changes in heteroplasmy.
+    </p>
+HTML
+    if ($inbam2) {
+        if($cs){
+            print OUT <<HTML;
+        <ul id='image-container3'>
+            <li><img src='circos/$mitocircosheterodifffigure' alt='Circos plot of heteroplasmic changes'></li>
+        </ul>
+HTML
+        }    
+    	print OUT _generate_html_table($mitoheterodiff);
     }
     else {
         print OUT "NA\n";
@@ -2988,6 +3142,33 @@ sub _print_file_list(){
                    "</tr>";
         }
         
+	#Heteroplasmic Changes 
+	if($cs){
+             $html.="<tr>".
+                        "<td rowspan='4'>Heteroplasmic Changes</td>".
+                        "<td>"._html_link($mitoheterodiff)."</td>".
+                        "<td>Heteroplasmic Change result </td>".
+                   "</tr>".
+                   "<tr>".
+                        "<td>"._html_link("circos/".$mitocircosheterodifffigure)."</td>".
+                        "<td>Circos plot of Heteroplasmic Change result </td>".
+                   "</tr>".
+                    "<tr>".
+                        "<td>"._html_link("circos/".$mitocircosheterodiffconfig)."</td>".
+                        "<td>Configure file for circos plot of Heteroplasmic Change result </td>".
+                   "</tr>".
+                    "<tr>".
+                        "<td>"._html_link("circos/".$mitoheterodifftextoutput)."</td>".
+                        "<td>Data file (text label) for circos plot of Heteroplasmic Change result </td>".
+                   "</tr>";
+        }else{
+            $html.="<tr>".
+                        "<td>Heteroplasmic Changes</td>".
+                        "<td>"._html_link($mitoheterodiff)."</td>".
+                        "<td>Heteroplasmic Change result </td>".
+                   "</tr>";
+        }
+
         #Relative Copy number
         if($cn && $type !=4){
             $html.="<tr>".
