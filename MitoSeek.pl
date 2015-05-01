@@ -48,8 +48,10 @@ my %genomebed                     = (                                           
 my $totalgenomebases              =3095677412;                                       #Total human genome size, used to calculate to average depth
 my $totalexonbases                =70757781;                                         #Total human exon size, used to calculate the average depth
 my %acceptedgenomelength          = ( "hg19" => 16571, "rCRS" => 16569 );            #The total mitochondrial genome size of hg19 and rCRS
-my $samtools                      = "$FindBin::Bin/Resources/samtools/samtools";                                      #Where is the samtools file
-my $mitomap                     = "$FindBin::Bin/mitomap.pl";                                      #Where is the samtools file
+my $samtools                      = "$FindBin::Bin/Resources/samtools/samtools";     	#Where is the samtools file
+my $mitomap                       = "$FindBin::Bin/mitomap.pl";                      	#Where is the mitomap file
+my $bwaindex          		  = "$FindBin::Bin/Resources/bwa-0.7.5a/rCRS/rCRS.fa";	#Where is the bwaindex (rCRS reference)
+my $bwa              		  = "$FindBin::Bin/Resources/bwa-0.7.5a/bwa";     	#Where is bwa
 
 my $isbam                         = 1;                                               #Default is 1, will auto determined from the $inbam1 file
 my $ischr                         = 0;                                               #Default is 0, means the chromosomes are named without prefix chr, will auto determined from the $inbam1's header
@@ -112,7 +114,7 @@ my $mitodepth2                         = "mito2_depth.txt";
 my $sampledepthi                       = "sample_i_depth.txt";  #store depth of imput sample1 
 my $sampledephtj                       = "sample_j_depth.txt";
 my $mitosomatic                        = "mito_somatic_mutation.txt";
-my $mitoheterodiff		       = "mito_heteroplasmic_changes.txt";
+my $mitoheterodiff		       = "mito_heteroplasmic_changes.txt";	
 my $mitoreport                         = "mitoSeek.html";
 
 #circos related
@@ -159,8 +161,8 @@ my $mmq               = 20;         #minimum map quality, default=20
 my $mbq               = 20;         #minimum base quality, default=20
 my $sb                = 10;         #remove all sites with strand bias score in the top [int] %, default=10;
 my $cn                = 0;          #Estimate relative copy number of input bam(s),does not work with mitochondria targeted sequencing bam files
-my $sp                = 5;         #somatic mutation detection threshold, [int]% of change in heteroplasmy in tumor, default=$hp
-my $sa                = 10;          #somatic mutation detection threshold, int number of alternative allele observed in tumor. default=$ha
+my $sp                = 5;          #somatic mutation detection threshold, [int]% of change in heteroplasmy in tumor, default=$hp
+my $sa                = 10;         #somatic mutation detection threshold, int number of alternative allele observed in tumor. default=$ha
 my $cs                = 1;          #Produce circos plot input files and circos plot figure for somatic mutations
 my $regionbed         = undef;      #A bed file that contains the regions mitoSeek will perform analysis on
 my $inref             = 'rCRS';     #The reference used in the input bam files
@@ -169,9 +171,7 @@ my $qc                = 1;          #Produce QC result
 my $str               = 2;          #structure variants cutoff, this cutoff applied to >$str mates supporting this cross different chromosome mapping
 my $strflagmentsize   = 500;        #structure variants cutoff for those abnormal large delete/insertion
 my $advance           = 0;          #if set 1, remap the reads onto the rCRS
-my $bwaindex          = undef;
-my $bwa               = "bwa";      #suppose you have bwa install in your $PATH
-my $help              =0;
+my $help              = 0;
 #========End defining other variables======================#
 
 #========Begin assiging values to variables================#
@@ -520,7 +520,7 @@ sub _main{
             $circos->prepare("somatic");
             $circos->plot();
          }
-    
+       
 	_info($index++.",Detecting heteroplasmic changes (Output: $mitoheterodiff)"); 
 	_determine_heterodiff( $mitobasecall1, $mitobasecall2, $sp, $sa, $isall,$mitoheterodiff );
 
@@ -950,12 +950,12 @@ Usage: perl mitoSeek.pl -i inbam
                         int = template size in bp, default=500
 -QC                     Produce QC result, (--noQC to turn off and -QC to turn on), default=on
 -samtools[samtools]     Tell where is the samtools program, default is your mitoseek directory/Resources/samtools/samtools
--bwa [bwa]              Tell where is the bwa program, default value is 'bwa' which is your \$PATH
--bwaindex [bwaindex]    Tell where is the bwa index of non-mitochondrial human genome, no default value
--advance                Will get mitochondrial reads in an advanced way, generally followed by 1) Initially extract mitochrodrial reads from 
-                        a bam file, then 2) remove those could be remapped to non-mitochondrial human genome by bwa. Advanced extraction needs 
-                        -bwaindex option. Default extraction without removing step.
-
+-bwa [bwa]              Tell where is the bwa program, default is your mitoseek directory/Resources/bwa-0.7.5a/bwa
+-bwaindex [bwaindex]    Tell where is the bwa index of rCRS reference genome, default is your mitoseek directory/Resources/bwa-0.7.5a/rCRS/rCRS.fa
+-advance                Ensures that mitochondrial genome is aligned to rCRS and not hg19, two step process: 
+			1) Initially extract mitochrodrial reads from a bam file 
+			2) Remapping those reads to the rCRS. 
+			Advanced extraction needs -bwaindex option. Default = off.
 
 
 USAGE
@@ -2305,7 +2305,7 @@ sub _sb {
     }
 }
 
-#Check whether samtools exist in ymy $PATH, If not, the program will exit
+#Check whether samtools exist in my $PATH, If not, the program will exit
 sub _check_samtools {
     my $r = `which samtools`;
     if ($r) {
