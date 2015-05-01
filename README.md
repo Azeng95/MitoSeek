@@ -62,8 +62,7 @@ Usage: perl mitoSeek.pl -i inbam
                         Default =20
 -mbq [int]              Minimum base quality
                         Default =20
--cn                     Estimate relative copy number of input bam(s), does not work with mitochondria targeted sequencing bam files,
-                        (-noch to turn off and -ch to turn on) 
+-cn                     Estimate relative copy number of input bam(s), does not work with mitochondria targeted sequencing bam files. Note that this is unreliable with exomes (exome enrichment quality will vary from sample to sample) and should only be used for whole-genome sequence data. (-noch to turn off and -ch to turn on) 
                         Default = off.
 -sp [int]               Somatic mutation detection threshold,int = percent of alternative allele observed in tumor
                         Default = 5
@@ -83,14 +82,14 @@ Usage: perl mitoSeek.pl -i inbam
                         Default = 500
 -QC                     Produce QC result, (--noQC to turn off and -QC to turn on)
                         Default = on
--samtools[samtools]     Tell where is the samtools program
+-samtools[samtools]     Location of the samtools program
                         Default = your mitoseek directory/Resources/samtools/samtools
--bwa [bwa]              Tell where is the bwa program
+-bwa [bwa]              Location of the bwa program
                         Default = your mitoseek directory/Resources/bwa-0.7.5a/bwa
--bwaindex [bwaindex]    Tell where is the bwa index of non-mitochondrial human genome
+-bwaindex [bwaindex]    Location of the bwa index of the rCRS reference genome
                         Default = your mitoseek directory/Resources/bwa-0.7.5a/rCRS/rCRS.fa
 -advance                Ensures that mitochondrial genome is aligned to rCRS and not hg19, two step process: 
-		        1) Initially extract mitochrodrial reads from a bam file 
+			1) Initially extract mitochrodrial reads from a bam file 
 			2) Remapping those reads to the rCRS. 
 			Advanced extraction needs -bwaindex option. 
 			Default = off.
