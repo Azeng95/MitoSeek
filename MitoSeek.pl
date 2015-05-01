@@ -1552,7 +1552,7 @@ sub _determine_variants {
         #3 (homoplasmic variant)
         my $stat = 0;
         if ( $heteroplasmy > 0 ) {
-	    if ( $alternate_allele eq $major_allele && $atcg{$minor_allele} < $ha ) {
+	    if ( $alternate_allele eq $major_allele && ( $atcg{$minor_allele} < $ha || $maf < $hp / 100 ) ) {
 		$stat = 3;
 	    } elsif ( $maf > $hp / 100 && $atcg{$minor_allele} > $ha ) { #use $depth which is not passed by function
                     $stat = 2;
@@ -1850,7 +1850,7 @@ sub _determine_somatic {
     open( OUT, ">$somaticoutput" ) or die $!;
     print OUT join "\t",
       (
-        "#chr",       "pos",            "ref", "tumorGenotype",
+        "#chr",       "pos",            "alt", "tumorGenotype",
         "tumorDepth", "tumorHeteroplasmy",     "normalGenotype", 
 	"normalDepth", "normalHeteroplasmy", 
 	"Mito.gene","Mito.genedetail\n"
@@ -1868,11 +1868,12 @@ sub _determine_somatic {
         my $tumorDP    = "";
         my $issomatic  = 0;
 
-		#Extra ratios added and equation changed on 140807
 
 		    my $ratio1  = 0;
 		    my $ratio2  = 0;
-			#altdiff added 140815
+		    my $ratio3  = 0;
+		    my $ratio4  = 0;
+			
 		    my $altdiff = abs($tumor{$loc}->{'alternate_allele_count'} - $normal{$loc}->{'alternate_allele_count'});
 
                     if ($isall) {
@@ -1881,6 +1882,12 @@ sub _determine_somatic {
                           ( sum @{ $tumor{$loc}->{'alleles_count'} } );
 	                $ratio2 =
                           $normal{$loc}->{'alternate_allele_count'} /
+                          ( sum @{ $normal{$loc}->{'alleles_count'} } );
+	                $ratio3 =
+                          $tumor{$loc}->{'minor_allele_count'} /
+                          ( sum @{ $tumor{$loc}->{'alleles_count'} } );
+	                $ratio4 =
+                          $normal{$loc}->{'minor_allele_count'} /
                           ( sum @{ $normal{$loc}->{'alleles_count'} } );
 		    }
 		    else {
@@ -1892,12 +1899,21 @@ sub _determine_somatic {
                           $normal{$loc}->{'alternate_allele_count'} /
                           ( $normal{$loc}->{'major_allele_count'} +
                               $normal{$loc}->{'minor_allele_count'} );
+                        $ratio3 =
+                          $tumor{$loc}->{'minor_allele_count'} /
+                          ( $tumor{$loc}->{'major_allele_count'} +
+                              $tumor{$loc}->{'minor_allele_count'} );
+                        $ratio4 =
+                          $normal{$loc}->{'minor_allele_count'} /
+                          ( $normal{$loc}->{'major_allele_count'} +
+                              $normal{$loc}->{'minor_allele_count'} );
+
                     }
-		        #if heteroplasmic difference (and empirical count) pass the cutoffs, assess to make sure that normal is a homoplasmy. 
+		        #if heteroplasmic difference (and empirical count) pass the cutoffs, assess to make sure that normal is a true homoplasmy. 
 		        #if tumor is also a homoplasmy and the Tumor Major Allele = Normal Major allele, it is not a somatic mutation. 
 		        #this is really just a safeguard in case depth filters are abnormally low
-                    if ((abs($ratio1-$ratio2) > $sp/100 && $altdiff > $sa) and ($ratio2 < $sp/100 || $normal{$loc}->{'minor_allele_count'} < $sa)){
-			if( $ratio1 < $sp/100 || $tumor{$loc}->{'minor_allele_count'} < $sa && $tumor{$loc}->{'major_allele'} eq $normal{$loc}->{'major_allele'}) {
+                    if ((abs($ratio1-$ratio2) > $sp/100 && $altdiff > $sa) and ($ratio4 < $sp/100 || $normal{$loc}->{'minor_allele_count'} < $sa)){
+			if( $ratio3 < $sp/100 || $tumor{$loc}->{'minor_allele_count'} < $sa && $tumor{$loc}->{'major_allele'} eq $normal{$loc}->{'major_allele'}) {
 			    $issomatic = 0;
 			}else{
 			    $issomatic = 1;
@@ -1909,17 +1925,16 @@ sub _determine_somatic {
             my @nmp = grep { $_ != 0 } @{ $normal{$loc}->{'alleles_count'} };
             $normalDP   = join "|", @nmp;
             $normalGeno = join "|", @{ $normal{$loc}->{'alleles'} }[ 0 .. $#nmp ];
-	#modified definitions for $normalDP and $normalGeno on 140807
 
             my @tmp = grep { $_ != 0 } @{ $tumor{$loc}->{'alleles_count'} };
             $tumorDP   = join "|", @tmp;
-            $tumorGeno = join "|", @{ $tumor{$loc}->{'alleles'} }[ 0 .. $#tmp ];
+            $tumorGeno = join "|", @{ $tumor{$loc}->{'alleles'} }[ 0 .. $#tmp ];	
             $result{$loc}->{'ref'}                = $normal{$loc}->{'reference_allele'};
             $result{$loc}->{'normalGeno'}         = $normalGeno;
             $result{$loc}->{'normalDP'}           = $normalDP;
             $result{$loc}->{'tumorGeno'}          = $tumorGeno;
             $result{$loc}->{'tumorDP'}            = $tumorDP;
-            
+
 	    $ratio1=_formatnumeric($ratio1);
 	    $ratio2=_formatnumeric($ratio2);
 
@@ -1952,7 +1967,6 @@ sub _determine_somatic {
     return %result;
 }
 
-#Entire heterodiff section added 150120
 #Given two basecall files and then determine the heteroplasmic changes
 #The first input basecall file is tumor sample while the second input basecall is normal sample
 #Parameters:
@@ -1971,7 +1985,7 @@ sub _determine_heterodiff {
     open( OUT, ">$heterodiffoutput" ) or die $!;
     print OUT join "\t",
       (
-        "#chr",       "pos",            "ref", "tumorGenotype",
+        "#chr",       "pos",  "tumorGenotype",
         "tumorDepth", "tumorHeteroplasmy",     "normalGenotype", 
 	"normalDepth", "normalHeteroplasmy", 
 	"Mito.gene","Mito.genedetail\n"
@@ -1989,11 +2003,12 @@ sub _determine_heterodiff {
         my $tumorDP    = "";
         my $heterodiff = 0;
 
-		#Extra ratios added and equation changed on 140807
 
 		    my $ratio1  = 0;
 		    my $ratio2  = 0;
-			#altdiff added 140815
+		    my $ratio3  = 0;
+		    my $ratio4  = 0;
+			
 		    my $altdiff = abs($tumor{$loc}->{'alternate_allele_count'} - $normal{$loc}->{'alternate_allele_count'});
 
                     if ($isall) {
@@ -2002,6 +2017,12 @@ sub _determine_heterodiff {
                           ( sum @{ $tumor{$loc}->{'alleles_count'} } );
 	                $ratio2 =
                           $normal{$loc}->{'alternate_allele_count'} /
+                          ( sum @{ $normal{$loc}->{'alleles_count'} } );
+                        $ratio3 =
+                          $tumor{$loc}->{'minor_allele_count'} /
+                          ( sum @{ $tumor{$loc}->{'alleles_count'} } );
+	                $ratio4 =
+                          $normal{$loc}->{'minor_allele_count'} /
                           ( sum @{ $normal{$loc}->{'alleles_count'} } );
 		    }
 		    else {
@@ -2013,9 +2034,18 @@ sub _determine_heterodiff {
                           $normal{$loc}->{'alternate_allele_count'} /
                           ( $normal{$loc}->{'major_allele_count'} +
                               $normal{$loc}->{'minor_allele_count'} );
+                        $ratio3 =
+                          $tumor{$loc}->{'minor_allele_count'} /
+                          ( $tumor{$loc}->{'major_allele_count'} +
+                              $tumor{$loc}->{'minor_allele_count'} );
+	                $ratio4 =
+                          $normal{$loc}->{'minor_allele_count'} /
+                          ( $normal{$loc}->{'major_allele_count'} +
+                              $normal{$loc}->{'minor_allele_count'} );
                     }
+			#Check to make sure that ratio discrepancy passes threshold, and that normal is a true heteroplasmy. 
                     if ( (abs($ratio1 - $ratio2) > $sp / 100 && $altdiff > $sa) 
-			and ($ratio1 > $sp / 100 && $normal{$loc}->{'minor_allele_count'} > $sa))
+			and ($ratio4 > $sp / 100 && $normal{$loc}->{'minor_allele_count'} > $sa))
                     {
                         $heterodiff = 1;
 		    } 
@@ -2036,6 +2066,7 @@ sub _determine_heterodiff {
             $result{$loc}->{'tumorGeno'}          = $tumorGeno;
             $result{$loc}->{'tumorDP'}            = $tumorDP;
             
+
 	    $ratio1=_formatnumeric($ratio1);
 	    $ratio2=_formatnumeric($ratio2);
 
@@ -2055,7 +2086,7 @@ sub _determine_heterodiff {
                         
             print OUT join "\t",
               (
-                "MT", $convertloc, $convertref,
+                "MT", $convertloc, 
                 $tumorGeno, $tumorDP, $ratio1, $normalGeno, 
 		$normalDP, $ratio2
               );
@@ -2101,6 +2132,7 @@ sub _read_basecall {
 	} else {
 		$alternate_allele = $atcg[0];
 	}
+
 
 	next if ($totaldepth <= $depth); 
 	#only if total allele count is greater than depth cutoff
@@ -2305,7 +2337,7 @@ sub _sb {
     }
 }
 
-#Check whether samtools exist in my $PATH, If not, the program will exit
+#Check whether samtools exist in ymy $PATH, If not, the program will exit
 sub _check_samtools {
     my $r = `which samtools`;
     if ($r) {
@@ -2882,6 +2914,7 @@ HTML
         print OUT "NA\n";
     }
 
+
 print OUT <<HTML;
     </div>
     <div class="module"><h2 id="M2">Heteroplasmic Changes</h2>
@@ -3142,6 +3175,7 @@ sub _print_file_list(){
                    "</tr>";
         }
         
+
 	#Heteroplasmic Changes 
 	if($cs){
              $html.="<tr>".
