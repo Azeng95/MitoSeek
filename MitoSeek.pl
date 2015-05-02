@@ -7,7 +7,7 @@
 #############################################
 #Edited By: Andy Zeng
 #Email: azeng95@gmail.com
-#Date: October 21st, 2014
+#Date: May 1st, 2014
 #BC Genome Sciences Centre
 #############################################
 
@@ -35,7 +35,7 @@ use Circoswrap;
 
 #========Begin defining global variables===============#
 my $starttime                     = time();                                          #Assign this value in the BEGIN section
-my $commandline                   = "perl $0 ".join (" ",@ARGV);                     #Output you input command in the report to reproduce you result
+my $commandline                   = "perl $0 ".join (" ",@ARGV);                     #Output your input command in the report to reproduce your result
 my %mitogenome                    = (                                               #Will be used in the pileup to determine the reference allele
                                         "hg19" => $FindBin::Bin . "/Resources/genome/hg19.fasta",
                                         "rCRS" => $FindBin::Bin . "/Resources/genome/rCRS.fasta");
@@ -112,9 +112,9 @@ my $mitocnv2                           = "mito2_cnv.txt";
 my $mitodepth1                         = "mito1_depth.txt";     #Store depth of mito1
 my $mitodepth2                         = "mito2_depth.txt";
 my $sampledepthi                       = "sample_i_depth.txt";  #store depth of imput sample1 
-my $sampledephtj                       = "sample_j_depth.txt";
+my $sampledepthj                       = "sample_j_depth.txt";
 my $mitosomatic                        = "mito_somatic_mutation.txt";
-my $mitoheterodiff		       = "mito_heteroplasmic_changes.txt";	
+my $mitoheterodiff		       = "mito_heteroplasmic_changes.txt";
 my $mitoreport                         = "mitoSeek.html";
 
 #circos related
@@ -133,25 +133,24 @@ my $mitocircosheterodifffigure         = "mito_heteroplasmic_changes_circos.png"
 my $mitocircosheterodiffconfig         = "mito_heteroplasmic_changes_circos.config";
 my $mitoheterodifftextoutput           = "mito_heteroplasmic_changes_circos.text.txt";
 
-my $mitooffset1                        = 33;                            #Not used currently
+my $mitooffset1                        = 33;                            
 my $mitooffset2                        = 33;
-# There three variables will be re-assigned during the main
+
+# These three variables will be re-assigned during the main
 my $mitobases                          = $acceptedgenomelength{'hg19'};  #Read from the regionbed file,default is the total bases of hg19
 my $totalbases                         = $totalexonbases;                #This the genome length, the exon length is 70757781
 my $totalbed                           = $exonbed{'withchr'};            #Default is exon or RNA-Seq sequences
 
 #Our own defined class, will be used in the _determine_variants
 my $convert = Convert->new();                                           #Handle h19 position and rCRS position convertion
-my $mitoanno = Mitoanno->new();                                         #Annotating a give position on mitochondria
-my $circos   = Circoswrap->new();
+my $mitoanno = Mitoanno->new();                                         #Annotating a given position on mitochondria
+my $circos   = Circoswrap->new();					#Producing circos plot 
 #========End defining global variables===================#
 
 #========Begin defining other variables==================#
 my $inbam1            = undef;      #-i
 my $inbam2            = undef;      #-j ,if this is provided, will conduct somatic mutation mining, and this will be assumed as normal sample
 my $type              = 1;          #1=exome, 2=whole genome, 3= RNAseq, 4 = mitochondria only
-#my $savebam           = 1;          #-b
-#my $saveallelecount   = 1;          #-a
 my $producecircosplot = 1;          #-ch, produce circos plot for heteroplasmic mutation
 my $hp                = 5;          #-hp, heteroplasmy threshold using [int] percent alternatie allele observed, default=5;
 my $ha                = 10;         #-ha, heteroplasmy threshold using [int] allele observed, default=10;
@@ -159,10 +158,10 @@ my $depth             = 10;         #The minimum recommended depth requirement f
 my $isall             = 1;          #If - A is used, the total read count is the total allele count of all allele observed. Otherwise, the total read count is the sum of major and minor allele counts. Default = on
 my $mmq               = 20;         #minimum map quality, default=20
 my $mbq               = 20;         #minimum base quality, default=20
-my $sb                = 10;         #remove all sites with strand bias score in the top [int] %, default=10;
+my $sb                = 10;         #Strand bias filter - now arbitrary
 my $cn                = 0;          #Estimate relative copy number of input bam(s),does not work with mitochondria targeted sequencing bam files
-my $sp                = 5;          #somatic mutation detection threshold, [int]% of change in heteroplasmy in tumor, default=$hp
-my $sa                = 10;         #somatic mutation detection threshold, int number of alternative allele observed in tumor. default=$ha
+my $sp                = 5;         #somatic mutation detection threshold, [int]% of change in heteroplasmy in tumor, default=$hp
+my $sa                = 10;          #somatic mutation detection threshold, int number of alternative allele observed in tumor. default=$ha
 my $cs                = 1;          #Produce circos plot input files and circos plot figure for somatic mutations
 my $regionbed         = undef;      #A bed file that contains the regions mitoSeek will perform analysis on
 my $inref             = 'rCRS';     #The reference used in the input bam files
@@ -180,8 +179,6 @@ unless (
         "i=s"   => \$inbam1,
         "j=s"   => \$inbam2,
         "t=i"   =>\$type,
-#        "b!"    => \$savebam,
-#        "a!"    => \$saveallelecount,
         "ch!"   => \$producecircosplot,
         "hp=i"  => \$hp,
         "ha=i"  => \$ha,
@@ -232,7 +229,6 @@ END {
         print "Program exist with Error \n";
     }else{
         my $interval = time() - $starttime;
-        #my $interval=192232;
         my $hours = int( $interval / 3600 );  # calculate precise, and then floor it
         my $minutes = int( ( $interval - $hours * 3600 ) / 60 );
         my $seconds = $interval % 60;
@@ -252,7 +248,7 @@ sub _check{
     }
     else {
         if ( !-e $inbam1 ) {
-            _error("input bam file (-i) '$inbam1' does not exists\n");
+            _error("input bam file (-i) '$inbam1' does not exist\n");
             _usage(1);
         }
         #Conver to abs_path
@@ -267,12 +263,12 @@ sub _check{
     #2) inbam2 checking
     if ( defined($inbam2) ) {
         if ( !-e $inbam2 ) {
-            _error("input bam file2 (-j) '$inbam2' does not exists\n");
+            _error("input bam file2 (-j) '$inbam2' does not exist\n");
             _usage(1);
         }
          $isbam = _is_file_binary($inbam2);
         unless($isbam){
-              _error("input bam file (-i) '$inbam1' is not in bam format\n");
+              _error("input bam file2 (-j) '$inbam2' is not in bam format\n");
             _usage(1);
         }
         $inbam2 = abs_path($inbam2) or die $!;
@@ -281,7 +277,7 @@ sub _check{
     #3) region file checking
     if ( defined($regionbed) ) {
         if ( !-e $regionbed ) {
-            _error("bed file (-L) does not exists\n");
+            _error("bed file (-L) does not exist\n");
             _usage(1);
         }
         $regionbed = abs_path($regionbed);
@@ -318,7 +314,7 @@ sub _initialVal{
     ($folder, undef, undef) = fileparse( $inbam1, qr/\.[^.]*/ );
     
     if ( -d $folder ) {
-        _warn("folder $folder already exists,will delete it first");
+        _warn("folder $folder already exists, will delete it first");
         rmtree($folder) or die $!;
     }
     mkdir $folder or die $!;
@@ -520,7 +516,7 @@ sub _main{
             $circos->prepare("somatic");
             $circos->plot();
          }
-       
+     
 	_info($index++.",Detecting heteroplasmic changes (Output: $mitoheterodiff)"); 
 	_determine_heterodiff( $mitobasecall1, $mitobasecall2, $sp, $sa, $isall,$mitoheterodiff );
 
@@ -540,7 +536,7 @@ sub _main{
             _info($index++.",Estimating relative copy number of '$mitobam1' (Output: $mitocnv1)");
             _wrap_mito_cnv($mitobam1,$inbam1,$mitobases,$totalbases,$isbam,$mbq,$mmq,$totalbed,$mitodepth1,$sampledepthi,$mitocnv1);
             _info($index++.",Estimating relative copy number of '$mitobam2' (Output: $mitocnv2)");
-            _wrap_mito_cnv($mitobam2,$inbam2,$mitobases,$totalbases,$isbam,$mbq,$mmq,$totalbed,$mitodepth2,$sampledephtj,$mitocnv2);
+            _wrap_mito_cnv($mitobam2,$inbam2,$mitobases,$totalbases,$isbam,$mbq,$mmq,$totalbed,$mitodepth2,$sampledepthj,$mitocnv2);
          }
         
 
@@ -817,7 +813,7 @@ sub _wrap_mito_cnv{
 #$totalbam: alignment mapped to whole genome
 #$isbam: bam or sam
 #$mmq: mimimal mapping quality
-#note that this assumes consistent exome enrichment in all samples. This assumption is impractical, as exome enrichment efficiency varies greatly for each sample. As a result, copy number estimations are not reliable for exome sequencing. 
+#note that this assumes consistent exome enrichment in all samples. This assumption is impractical, as exome enrichment efficiency varies greatly for each sample. As a result, copy number estimations are not reliable for exome sequencing, and only useful with whole genome sequencing samples. 
 
 sub _mito_cnv_by_reads{
     my ($mitobam,$totalbam,$isbam,$mmq) = @_;
@@ -829,7 +825,7 @@ sub _mito_cnv_by_reads{
 }
 
 
-#For exom sequence bed is the region of exon while for whole genome, the bed is the region of all chromosome
+#For exome sequence bed is the region of exon while for whole genome, the bed is the region of all chromosomes
 sub _mito_cnv_by_depth{
     my ($mitobam,$totalbam,$mitobases,$totalbases,$isbam,$mbq,$mmq,$bed,$mitodepthoutput,$totaldepthoutput) = @_;
     my $com = "$samtools depth -q $mbq -Q mmq $mitobam > $mitodepthoutput";
@@ -923,7 +919,7 @@ sub _usage {
     my $usage=<<USAGE;
 Usage: perl mitoSeek.pl -i inbam 
 -i [bam]                Input bam file
--j [bam]                Input bam file2, if this file is provided, it will conduct somatic mutation mining, and it will be 
+-j [bam]                Input bam file 2, if this file is provided, it will conduct somatic mutation mining, and it will be 
                         taken as normal tissue.
 -t [input type]         Type of the bam files, the possible choices are 1=exome, 2=whole genome, 3= RNAseq, 4 = mitochondria only,default = 1
 -d [int]                The minimum recommended depth requirement for detecting heteroplasmy and somatic mutations. default=10
@@ -935,23 +931,24 @@ Usage: perl mitoSeek.pl -i inbam
                         Otherwise, the total read count is the sum of major and minor allele counts. Default = on
 -mmq [int]              Minimum map quality, default =20
 -mbq [int]              Minimum base quality, default =20
--sb [int]               Remove all sites with strand bias score in the top [int] %, default = 10 
 -cn                     Estimate relative copy number of input bam(s), does not work with mitochondria targeted sequencing bam files,
-                        (-nocn to turn off and -cn to turn on) *unreliable with exomes.  default = off.
+                        (-nocn to turn off and -cn to turn on), default = off.
+			Note that this is unreliable with exomes and should only be used for whole-genome sequence data.
+			(exome enrichment quality will vary from sample to sample)
 -sp [int]               Somatic mutation detection threshold,int = percent of alternative allele observed in tumor, default int=5
--sa [int] Somatic mutation detection threshold,int = number of alternative allele observed in tumor, default int=10
+-sa [int] 		Somatic mutation detection threshold,int = number of alternative allele observed in tumor, default int=10
 -cs                     Produce circos plot input files and circos plot figure for somatic mutation, 
-                        (-nocs to turn off and -cs to turn on), default = off
+                        (-nocs to turn off and -cs to turn on), default = on
 -r [ref]                The reference used in the bam file, the possible choices are hg19 and rCRS, default=rCRS
 -R [ref]                The reference used in the output files, the possible choices are hg19 and rCRS, default=rCRS
 -str [int]              Structure variants cutoff for those discordant mapping mates, 
                         int = number of spanning reads supporting this structure variants, default = 2
 -strf [int]             Structure variants cutoff for those large deletions,
                         int = template size in bp, default=500
--QC                     Produce QC result, (--noQC to turn off and -QC to turn on), default=on
--samtools[samtools]     Tell where is the samtools program, default is your mitoseek directory/Resources/samtools/samtools
--bwa [bwa]              Tell where is the bwa program, default is your mitoseek directory/Resources/bwa-0.7.5a/bwa
--bwaindex [bwaindex]    Tell where is the bwa index of rCRS reference genome, default is your mitoseek directory/Resources/bwa-0.7.5a/rCRS/rCRS.fa
+-QC                     Produce QC result, (-noQC to turn off and -QC to turn on), default=on
+-samtools[samtools]     Location of the samtools program, default is your mitoseek directory/Resources/samtools/samtools
+-bwa [bwa]              Location of the bwa program, default is your mitoseek directory/Resources/bwa-0.7.5a/bwa
+-bwaindex [bwaindex]    Location of the bwa index of rCRS reference genome, default is your mitoseek directory/Resources/bwa-0.7.5a/rCRS/rCRS.fa
 -advance                Ensures that mitochondrial genome is aligned to rCRS and not hg19, two step process: 
 			1) Initially extract mitochrodrial reads from a bam file 
 			2) Remapping those reads to the rCRS. 
@@ -984,7 +981,7 @@ sub _mito_qc_stat {
         $depthdistribution_table,  $templatelengthdistribution_table,
         $percentofbasepairscovered_table
     ) = @_;
-    my $maxreads = 100000; #In case some alignment on mitochondrial is extremely large that will take too much memory and then crash ymy server.
+    my $maxreads = 100000; #In case some alignment on mitochondrial is extremely large that will take too much memory and crash the server.
     $maxreads = 10 if ($debug);
 
     if ($isbam) {
@@ -1000,7 +997,7 @@ sub _mito_qc_stat {
     my $encoding = "Sanger / Illumina 1.9";    #Default
     my $top      = 5;
     my $count    = 1;
-    my @scores;    #store the qual ascii value to determine quality encoding
+    my @scores;    #store the quality ascii value to determine quality encoding
     while (<IN>) {
         s/\r|\n//g;
         $count++;
@@ -1019,7 +1016,7 @@ sub _mito_qc_stat {
     @scores = sort { $a <=> $b } @scores;
     my $lowestChar = $scores[0];
     if ( $lowestChar < 33 ) {
-        #Generate a warnings
+        #Generate a warning
         _warn(
 "No known encodings with chars < 33 (Yours was $lowestChar), However, we will use Sanger / Illumina 1.9 encoding instead"
         );
@@ -1183,8 +1180,8 @@ sub _boxplot {
         b_margin          => 10,
         l_margin          => 10,
         r_margin          => 20,
-        do_stats              => 0,
-        box_fill            =>1,
+        do_stats          => 0,
+        box_fill          =>1,
         dclrs             => ['lgreen','lred'],  #will be the color in the box of 25%-75%
         fgclr             => 'dblue' ,        #color for the outlier, etc
     ) or warn $graph->error;
@@ -1446,7 +1443,7 @@ sub _get_mitochondrial_bed {
     }
     
     if($len != 16569 && $len !=16571){
-       _error("Mithochondrial genome length ($len) is invalid");
+       _error("Mitochondrial genome length ($len) is invalid");
        exit(1);
     }
     open( OUT, ">$outbed" );
@@ -1478,7 +1475,7 @@ sub _determine_variants {
             $reverse_T, $reverse_C, $reverse_G
         ) = split "\t";
 	
-	#Even if the user chooses not to realign to the rCRS, this will ensure that the variants are reported in rCRS locations. 
+	#Even if the user chooses not to realign to the rCRS, this will ensure that the variants are reported in rCRS locations for $outref = rCRS. 
             my $convertloc=$loc;
             my $convertref=$ref;
             if($inref ne $outref){ #need to convert genome location
@@ -1547,7 +1544,7 @@ sub _determine_variants {
 
          #Stat values could be
         #0 (not a variant)
-        #1 (show variant alleles, but does not pass the cutoff) (hp,ha,depth)
+        #1 (has variant alleles, but does not pass the cutoff) (hp,ha,depth)
         #2 (heteroplasmic variant)
         #3 (homoplasmic variant)
         my $stat = 0;
@@ -1665,6 +1662,7 @@ sub _determine_variants {
     print OUT "\n";
 
     foreach my $loc ( sort { $a <=> $b } keys %result ) {
+	#if the position is a Heteroplasmy
         if ( $result{$loc}->{'stat'} == 2 ) {
             my $convertloc=$loc;
             my $convertref=$result{$loc}->{'ref'};
@@ -1716,8 +1714,9 @@ sub _determine_variants {
              print OUT join "\t",($mitoanno->pathogenic($convertloc));
        
             print OUT "\n";
-        }
- if ( $result{$loc}->{'stat'} == 3 ) {
+      
+	#If the position is a Homoplasmy
+ }elsif ( $result{$loc}->{'stat'} == 3 ) {
             my $convertloc=$loc;
             my $convertref=$result{$loc}->{'ref'};
             if($inref ne $outref){ #need to convert genome location
@@ -1832,7 +1831,6 @@ sub _get_mitochondrial_bam_advance {
     my $comm = "perl $mitomap -r $bwaindex -i $inbam -b $mbed -mmq $mmq -o $outbam -samtools $samtools -bwa $bwa";
     _run($comm);
 }
- 
 #Given two basecall files and then determine the somatic mutations
 #The first input basecall file is tumor sample while the second input basecall is normal sample
 #Parameters:
@@ -2134,7 +2132,6 @@ sub _read_basecall {
 	} else {
 		$alternate_allele = $atcg[0];
 	}
-
 
 	next if ($totaldepth <= $depth); 
 	#only if total allele count is greater than depth cutoff
@@ -2916,7 +2913,6 @@ HTML
         print OUT "NA\n";
     }
 
-
 print OUT <<HTML;
     </div>
     <div class="module"><h2 id="M2">Heteroplasmic Changes</h2>
@@ -3177,7 +3173,6 @@ sub _print_file_list(){
                    "</tr>";
         }
         
-
 	#Heteroplasmic Changes 
 	if($cs){
              $html.="<tr>".
@@ -3231,7 +3226,7 @@ sub _print_file_list(){
                         "<td> Result of depth on whole genome for CNV estimation (-i) (Tumor)</td>".
                     "</tr>".
                     "<tr>".
-                        "<td>"._html_link($sampledephtj)."</td>".
+                        "<td>"._html_link($sampledepthj)."</td>".
                         "<td> Result of depth on whole genome for CNV estimation (-j) (Normal)</td>".
                     "</tr>";
         }
@@ -3444,4 +3439,3 @@ sub _generate_html_table {
     $html .= "</table>";
     return $html;
 }
-
