@@ -1832,6 +1832,7 @@ sub _get_mitochondrial_bam_advance {
     my $comm = "perl $mitomap -r $bwaindex -i $inbam -b $mbed -mmq $mmq -o $outbam -samtools $samtools -bwa $bwa";
     _run($comm);
 }
+ 
 #Given two basecall files and then determine the somatic mutations
 #The first input basecall file is tumor sample while the second input basecall is normal sample
 #Parameters:
@@ -1850,10 +1851,10 @@ sub _determine_somatic {
     open( OUT, ">$somaticoutput" ) or die $!;
     print OUT join "\t",
       (
-        "#chr",       "pos",            "alt", "tumorGenotype",
+        "#chr",       "pos",            "ref", "tumorGenotype",
         "tumorDepth", "tumorHeteroplasmy",     "normalGenotype", 
 	"normalDepth", "normalHeteroplasmy", 
-	"Mito.gene","Mito.genedetail\n"
+	"gene","genedetail","exonic_function","aminochange\n"
       );
 
 #Get the overlapped locations and then loop them to determine whether it is a somatic mutation
@@ -1868,12 +1869,11 @@ sub _determine_somatic {
         my $tumorDP    = "";
         my $issomatic  = 0;
 
-
 		    my $ratio1  = 0;
 		    my $ratio2  = 0;
 		    my $ratio3  = 0;
 		    my $ratio4  = 0;
-			
+
 		    my $altdiff = abs($tumor{$loc}->{'alternate_allele_count'} - $normal{$loc}->{'alternate_allele_count'});
 
                     if ($isall) {
@@ -1938,9 +1938,15 @@ sub _determine_somatic {
 	    $ratio1=_formatnumeric($ratio1);
 	    $ratio2=_formatnumeric($ratio2);
 
+	    my $alt_allele;
+	    my $normal_major = $normal{$loc}->{'major_allele'};
+
+            $alt_allele=$tumor{$loc}->{'major_allele'};
+            $alt_allele=$tumor{$loc}->{'minor_allele'} if $alt_allele eq $normal_major; 
+
             my $convertloc=$loc;
             my $convertref=$normal{$loc}->{'reference_allele'};
-            #my $convertref=$result{$loc}->{'ref'};
+
             if($inref ne $outref){ #need to convert genome location
                   if($inref eq 'hg19' && $outref eq 'rCRS'){
                         $convertloc=$convert->hg19TorCRS($loc);
@@ -1958,8 +1964,8 @@ sub _determine_somatic {
                 $tumorGeno, $tumorDP, $ratio1, $normalGeno, 
 		$normalDP, $ratio2
               );
-              my ($genetmp,$genedetailtmp,undef,undef) = $mitoanno->annotation($convertloc);
-            print OUT "\t",$genetmp,"\t",$genedetailtmp;
+            print OUT "\t";
+	    print OUT join "\t",($mitoanno->annotation($convertloc,$normal_major,$alt_allele));
             print OUT "\n";
         }
     }
@@ -1985,7 +1991,7 @@ sub _determine_heterodiff {
     open( OUT, ">$heterodiffoutput" ) or die $!;
     print OUT join "\t",
       (
-        "#chr",       "pos",  "tumorGenotype",
+        "#chr",       "pos",  "ref", "tumorGenotype",
         "tumorDepth", "tumorHeteroplasmy",     "normalGenotype", 
 	"normalDepth", "normalHeteroplasmy", 
 	"Mito.gene","Mito.genedetail\n"
@@ -2003,12 +2009,11 @@ sub _determine_heterodiff {
         my $tumorDP    = "";
         my $heterodiff = 0;
 
-
 		    my $ratio1  = 0;
 		    my $ratio2  = 0;
 		    my $ratio3  = 0;
 		    my $ratio4  = 0;
-			
+
 		    my $altdiff = abs($tumor{$loc}->{'alternate_allele_count'} - $normal{$loc}->{'alternate_allele_count'});
 
                     if ($isall) {
@@ -2055,7 +2060,6 @@ sub _determine_heterodiff {
             my @nmp = grep { $_ != 0 } @{ $normal{$loc}->{'alleles_count'} };
             $normalDP   = join "|", @nmp;
             $normalGeno = join "|", @{ $normal{$loc}->{'alleles'} }[ 0 .. $#nmp ];
-	#modified definitions for $normalDP and $normalGeno on 140807
 
             my @tmp = grep { $_ != 0 } @{ $tumor{$loc}->{'alleles_count'} };
             $tumorDP   = join "|", @tmp;
@@ -2066,13 +2070,11 @@ sub _determine_heterodiff {
             $result{$loc}->{'tumorGeno'}          = $tumorGeno;
             $result{$loc}->{'tumorDP'}            = $tumorDP;
             
-
 	    $ratio1=_formatnumeric($ratio1);
 	    $ratio2=_formatnumeric($ratio2);
 
             my $convertloc=$loc;
             my $convertref=$normal{$loc}->{'reference_allele'};
-            #my $convertref=$result{$loc}->{'ref'};
             if($inref ne $outref){ #need to convert genome location
                   if($inref eq 'hg19' && $outref eq 'rCRS'){
                         $convertloc=$convert->hg19TorCRS($loc);
@@ -2086,7 +2088,7 @@ sub _determine_heterodiff {
                         
             print OUT join "\t",
               (
-                "MT", $convertloc, 
+                "MT", $convertloc, $convertref,
                 $tumorGeno, $tumorDP, $ratio1, $normalGeno, 
 		$normalDP, $ratio2
               );
