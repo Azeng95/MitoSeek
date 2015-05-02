@@ -1,4 +1,4 @@
-Table of Content
+Table of Contents
 ================
 * [Overview](#overview)
 * [Usage] (#usage)
@@ -89,10 +89,10 @@ Usage: perl mitoSeek.pl -i inbam
 -bwaindex [bwaindex]    Location of the bwa index of the rCRS reference genome
                         Default = your mitoseek directory/Resources/bwa-0.7.5a/rCRS/rCRS.fa
 -advance                Ensures that mitochondrial genome is aligned to rCRS and not hg19, two step process: 
-			1) Initially extract mitochrodrial reads from a bam file 
-			2) Remapping those reads to the rCRS. 
-			Advanced extraction needs -bwaindex option. 
-			Default = off.
+				1) Initially extract mitochrodrial reads from a bam file 
+				2) Remapping those reads to the rCRS. 
+				Advanced extraction needs -bwaindex option. 
+				Default = off.
 ```
 
 <a name="change"/>
@@ -141,14 +141,14 @@ MitoSeek runs on 32-bit or 64-bit GNU/Linux and request perl packages like **GD:
 
 
 <a name="step1"/>
-### Step1: Intall perl packages required by [circos](http://circos.ca/)
+### Step1: Install perl packages required by [circos](http://circos.ca/)
 MitoSeek utilizes [circos](http://circos.ca/) to plot heteroplasmy and somatic mutation, thus, perl packages required by [circos](http://circos.ca/) needed to been installed first.
 
 ```bash
 #1) go to the circos package folder which is included as part of the MitoSeek 
 cd Resources/circos-0.56/bin
 
-#2) Check whether all the packages needed by circos plot are intalled on your PC,
+#2) Check whether all the packages needed by circos plot are installed on your PC,
 #if this does not work, try 'chmod +x test.modules'
 ./test.modules
 ```
@@ -228,7 +228,7 @@ If this happens, try to install the missing packages by **cpan** (If you you don
 ./test.modules |grep fail|cut -f2 -d" "|xargs -I {} cpan {}
 ``` 
 <a name="step2"/>
-### Step2: Intall perl packages required by MitoSeek
+### Step2: Install perl packages required by MitoSeek
 In addition to the perl packages required by [circos](http://circos.ca/), there are several other packages needed to be installed on your PC.
 ```bash
 #go the the folder where your MitoSeek is
@@ -397,7 +397,7 @@ Whole genome exon coordinates are used to estimate the **relative mitochondrial 
 Here is the scripts we download and prepare the exon bed file
 
 ```bash
-#Wkdir: yourmitseek/Resources/genome
+#Wkdir: yourmitoseek/Resources/genome
 #refGene annotation file (refGene.txt)
 #description of refGene is here at 
 #https://cgwb.nci.nih.gov/cgi-bin/hgTables?hgsid=79902&hgta_doSchemaDb=hg18&hgta_doSchemaTable=refGene
